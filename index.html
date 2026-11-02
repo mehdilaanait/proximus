@@ -560,7 +560,7 @@ function agg(w){ const o={},p={}; for(const k in w){ o[k]=sum(cur(w[k])); p[k]=s
 
 // ---------- TABS ----------
 const TABS = [
-  ['overview','Overview'],['channels','Channels & media'],['search','Search: paid vs organic'],['keywords','Keywords'],['share','Search market share'],['seo','SEO content groups'],['social','Social'],['products','Products'],['funnel','Order funnel'],['sources','Data sources & definitions']
+  ['overview','Overview'],['channels','Channels & media'],['search','Search: paid vs organic'],['keywords','Keywords'],['share','Search market share'],['seo','SEO content groups'],['social','Social'],['sources','Data sources & definitions']
 ];
 let ACTIVE='overview';
 
@@ -729,7 +729,7 @@ function renderKeywords(root){
 }
 
 function renderShare(root){
-  root.innerHTML=`<div class="callout"><b>Does “search market share” exist?</b> Yes — not as one official number, but as three complementary measures, all shown below:
+  root.innerHTML=`<div class="callout">
   <ol><li><b>Paid impression share</b> — Google Ads Auction Insights: how often Proximus ads show vs. Orange, Telenet, BASE, DIGI… on the same auctions.</li>
   <li><b>Organic share of voice</b> — visibility index from an SEO tool (Semrush, Sistrix, SE Ranking) on a fixed basket of mobile keywords, weighted by search volume and CTR per position.</li>
   <li><b>Share of search</b> — brand query volume of Proximus vs. competitors (Google Trends / Keyword Planner). A recognised leading indicator of market share.</li></ol></div>
