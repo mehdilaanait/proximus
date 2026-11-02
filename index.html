@@ -729,10 +729,7 @@ function renderKeywords(root){
 }
 
 function renderShare(root){
-  root.innerHTML=`<div class="callout"><b>Does “search market share” exist?</b> Yes — not as one official number, but as three complementary measures, all shown below:
-  <ol><li><b>Paid impression share</b> — Google Ads Auction Insights: how often Proximus ads show vs. Orange, Telenet, BASE, DIGI… on the same auctions.</li>
-  <li><b>Organic share of voice</b> — visibility index from an SEO tool (Semrush, Sistrix, SE Ranking) on a fixed basket of mobile keywords, weighted by search volume and CTR per position.</li>
-  <li><b>Share of search</b> — brand query volume of Proximus vs. competitors (Google Trends / Keyword Planner). A recognised leading indicator of market share.</li></ol></div>
+ 
   <div class="grid2">${card('ms-is','Paid search impression share — top 3 operators','Non-brand mobile campaigns, weekly')}${card('ms-lost','Proximus: where the impressions go','Average of selected period')}</div>
   ${card('ms-ai','Auction Insights — non-brand mobile campaigns','Overlap / position above / outranking are measured against Proximus')}
   <div class="grid2">${card('ms-seo','Organic share of voice','Visibility on 250 tracked mobile keywords (BE, NL + FR)')}${card('ms-sos','Share of search','Brand search volume, Belgium, last 3 months')}</div>`;
