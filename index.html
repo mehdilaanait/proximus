@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mobile Performance Dashboard — POC</title>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f3f0; --surface-1:#fcfcfb; --border:#e4e2dc;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#8a8984;
+  --grid:#ebe9e4; --neutral-bar:#c9c7c0; --accent:#5b2d90;
+  --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-4:#eda100; --series-5:#e87ba4; --series-6:#008300; --series-7:#6250d6; --series-8:#e34948;
+  --good:#006300; --bad:#c12f2f;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme:dark; --bg:#111110; --surface-1:#1a1a19; --border:#2e2e2b;
+    --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8d8c85; --grid:#2a2a27; --neutral-bar:#4a4a46; --accent:#b49be6;
+    --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500; --series-5:#d55181; --series-6:#008300; --series-7:#9085e9; --series-8:#e66767;
+    --good:#4cc24c; --bad:#ef7070;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark; --bg:#111110; --surface-1:#1a1a19; --border:#2e2e2b;
+  --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8d8c85; --grid:#2a2a27; --neutral-bar:#4a4a46; --accent:#b49be6;
+  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-4:#c98500; --series-5:#d55181; --series-6:#008300; --series-7:#9085e9; --series-8:#e66767;
+  --good:#4cc24c; --bad:#ef7070;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.top{position:sticky;top:0;z-index:5;background:var(--surface-1);border-bottom:1px solid var(--border)}
+.bar1{display:flex;align-items:center;gap:16px;padding:14px 28px 6px;flex-wrap:wrap}
+.logo{height:34px;width:auto;display:block}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-bottom:16px}
+.grid3 .card{margin-bottom:0}
+.bar1 h1{font-size:19px;margin:0;font-weight:650;letter-spacing:-.01em}
+.badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:99px;border:1px solid var(--border);color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.spacer{flex:1}
+.ctrl{display:flex;align-items:center;gap:8px;color:var(--text-secondary);font-size:13px}
+select,button.ghost{font:inherit;color:var(--text-primary);background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer}
+#tabs{display:flex;gap:2px;padding:0 20px;overflow-x:auto}
+.tab{font:inherit;background:none;border:0;border-bottom:2px solid transparent;padding:10px 10px 9px;color:var(--text-secondary);cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--text-primary)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+main{padding:22px 28px 60px;max-width:1500px;margin:0 auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi-l{font-size:12.5px;color:var(--text-secondary)}
+.kpi-v{font-size:26px;font-weight:650;letter-spacing:-.02em;margin:2px 0}
+.kpi-d{font-size:12px}
+.kpi-s{font-size:12px;color:var(--text-muted);margin-top:2px}
+.muted{color:var(--text-muted)}
+.delta{font-weight:600;white-space:nowrap;font-size:12px}
+.delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--text-muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:16px;margin-bottom:16px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:16px 18px;min-width:0;margin-bottom:16px}
+.grid2 .card{margin-bottom:0}
+.card header{margin-bottom:10px}
+.card h3{margin:0;font-size:15px;font-weight:620}
+.card header p{margin:2px 0 0;font-size:12.5px;color:var(--text-secondary)}
+h2.sec{font-size:17px;margin:26px 0 12px;font-weight:650}
+svg{display:block;overflow:visible}
+svg text{font-family:inherit}
+.grid{stroke:var(--grid);stroke-width:1}
+.axis{fill:var(--text-muted);font-size:11px}
+.lab{fill:var(--text-secondary);font-size:12.5px}
+.val{fill:var(--text-primary);font-size:12px;font-weight:600}
+.xh{stroke:var(--text-muted);stroke-width:1;stroke-dasharray:3 3}
+.bar{transition:opacity .12s}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--text-secondary);margin:0 0 8px}
+.legend b{color:var(--text-primary);font-weight:600}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.tip{position:fixed;display:none;pointer-events:none;z-index:50;background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.14);min-width:160px}
+.tip b{display:block;margin-bottom:4px}
+.tip div{display:flex;align-items:center;gap:4px}
+.tip div span{margin-left:auto;padding-left:14px;font-weight:600}
+.tt-total{border-top:1px solid var(--border);margin-top:4px;padding-top:4px}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--text-secondary);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none}
+th.sorted{color:var(--text-primary)}
+td{padding:8px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
+tbody tr:hover td{background:color-mix(in srgb,var(--series-1) 6%,transparent)}
+tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0}
+.num{text-align:right}
+.cellbar{display:flex;align-items:center;gap:8px;min-width:150px}
+.cellbar i{flex:1;display:block;height:8px}
+.cellbar span{display:block;height:8px;border-radius:0 4px 4px 0;background:color-mix(in srgb,var(--series-1) 40%,transparent)}
+.cellbar em{font-style:normal;min-width:62px;text-align:right}
+.segbar{display:flex;gap:2px;height:28px;border-radius:6px;overflow:hidden;margin:6px 0 12px}
+.segbar div:last-child{border-radius:0 6px 6px 0}
+.callout{background:var(--surface-1);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;margin-bottom:16px}
+.callout ol{margin:8px 0 0;padding-left:20px} .callout li{margin:3px 0}
+.callout.small{font-size:13px;color:var(--text-secondary)}
+.note{font-size:12px;color:var(--text-muted);margin:10px 0 0}
+.filters{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filters label{font-size:13px;color:var(--text-secondary);margin-right:4px}
+.chip{font:inherit;font-size:13px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);border-radius:99px;padding:5px 12px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.defs dt{font-weight:600;margin-top:10px} .defs dd{margin:2px 0 0;color:var(--text-secondary)}
+
+.fbar{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;padding:10px 28px;border-top:1px solid var(--border);background:var(--bg);font-size:13px}
+.fl{display:flex;align-items:center;gap:6px;color:var(--text-secondary)}
+.fl select{padding:5px 8px}
+.off{opacity:.45;pointer-events:none}
+.fl-note{font-size:12px}
+.small{font-size:12.5px;padding:4px 10px}
+.dd{position:relative}
+.dd summary{list-style:none;cursor:pointer;border:1px solid var(--border);background:var(--surface-1);border-radius:8px;padding:5px 10px;color:var(--text-secondary)}
+.dd summary::-webkit-details-marker{display:none}
+.dd summary::after{content:' ▾'}
+.dd summary b{color:var(--text-primary);font-weight:600}
+.dd-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:20;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.14);min-width:230px;display:flex;flex-direction:column;gap:6px}
+.dd-panel label{display:flex;gap:8px;align-items:center;cursor:pointer;color:var(--text-primary)}
+.dd-act{display:flex;gap:8px;margin-bottom:4px}
+.dd-act button{font:inherit;font-size:12px;border:0;background:none;color:var(--accent);cursor:pointer;padding:0}
+.chip .sw{margin-right:6px}
+.fn-title{font-weight:600;margin-bottom:6px}
+.fn-sum{display:flex;gap:24px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);border-top:1px solid var(--grid);padding-top:10px;margin-top:4px}
+.fn-sum b{color:var(--text-primary)}
+.heat{display:inline-block;min-width:58px;padding:2px 6px;border-radius:4px}
+.filters select{font:inherit;font-size:13px}
+.onbar{fill:#fff;font-size:11.5px;font-weight:500}
+code{font-size:12px;background:var(--bg);padding:1px 5px;border-radius:4px}
+@media (max-width:700px){.grid2{grid-template-columns:1fr} main{padding:16px} .bar1{padding:12px 16px 4px}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="bar1">
+    <img class="logo" alt="Proximus" src="data:image/png;base64,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">
+    <h1>Proximus Mobile — Performance Dashboard</h1>
+    <span class="badge">POC · sample data</span>
+    <span class="spacer"></span>
+    <div class="ctrl"><span id="range"></span>
+      <button class="ghost" id="theme" title="Toggle light/dark">Light / dark</button>
+    </div>
+  </div>
+  <nav id="tabs"></nav>
+  <div id="fbar" class="fbar"></div>
+</div>
+<main id="main"></main>
+<script>
+// ---------- Sample data generator (deterministic) ----------
+const N = 52; // weeks
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry32(20261030);
+const noise = (amp) => 1 + (rnd()*2-1)*amp;
+
+// week start dates (Mondays), last = 2026-10-19
+const WEEKS = [];
+{ const end = new Date(Date.UTC(2026,9,19)); for(let i=N-1;i>=0;i--){ const d=new Date(end); d.setUTCDate(d.getUTCDate()-7*i); WEEKS.push(d);} }
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WEEK_LABELS = WEEKS.map(d=>`${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`);
+
+// market seasonality: summer dip, Black Friday / Christmas peak (Nov-Dec 2025), smartphone launch (Sep 2026), Jan sales
+const MARKET = WEEKS.map((d)=>{
+  const m=d.getUTCMonth(), day=d.getUTCDate(); let f=1;
+  if(m===6||(m===7&&day<20)) f*=0.88;
+  if(m===10&&day>=20) f*=1.35; else if(m===10) f*=1.08;
+  if(m===11&&day<22) f*=1.22; if(m===11&&day>=22) f*=0.9;
+  if(m===0&&day<20) f*=1.05;
+  if(m===8&&day>=8) f*=1.18; if(m===9&&day<10) f*=1.08;
+  return f;
+});
+const PHONE_LAUNCH = WEEKS.map(d=>{const m=d.getUTCMonth(),day=d.getUTCDate(); return (m===8&&day>=8)||(m===9&&day<14)?1.5:1});
+
+function series(base,{trend=0,amp=0.07,season=1,extra=null}={}){
+  return WEEKS.map((_,i)=>{ const t=1+trend*(i-N+1)/N; const s=Math.pow(MARKET[i],season); const e=extra?extra[i]:1; return Math.max(0,base*t*s*e*noise(amp)); });
+}
+
+// ---------- Channels ----------
+const CHANNELS = [
+  {id:'paid_search', name:'Paid search', group:'Paid media', sessions:95000, cto:0.046, close:0.36, spend:86000, trend:0.04},
+  {id:'organic', name:'Organic search', group:'Organic', sessions:158000, cto:0.031, close:0.34, spend:0, trend:-0.12},
+  {id:'social', name:'Paid social', group:'Paid media', sessions:61000, cto:0.016, close:0.25, spend:47000, trend:0.15},
+  {id:'direct', name:'Direct', group:'Direct & referral', sessions:121000, cto:0.054, close:0.39, spend:0, trend:0.02},
+  {id:'email', name:'Email', group:'Owned', sessions:26000, cto:0.041, close:0.38, spend:0, trend:0},
+  {id:'app', name:'Proximus app', group:'Owned', sessions:72000, cto:0.064, close:0.46, spend:0, trend:0.1},
+  {id:'display', name:'Display (DV360)', group:'Paid media', sessions:39000, cto:0.009, close:0.22, spend:36000, trend:-0.05},
+  {id:'org_social', name:'Organic social', group:'Organic', sessions:3000, cto:0.018, close:0.29, spend:0, trend:0.08},
+  {id:'ai', name:'AI assistants', group:'Organic', sessions:6500, cto:0.057, close:0.41, spend:0, trend:1.6},
+  {id:'referral', name:'Referral & affiliates', group:'Direct & referral', sessions:15000, cto:0.03, close:0.33, spend:0, trend:0},
+];
+CHANNELS.forEach(c=>{
+  c.w = {};
+  c.w.sessions = series(c.sessions,{trend:c.trend});
+  c.w.cto = c.w.sessions.map(v=>v*c.cto*0.1*noise(0.06));
+  c.w.orders = c.w.cto.map(v=>v*c.close*noise(0.07));
+  c.w.spend = c.spend? series(c.spend,{trend:c.trend*0.5,amp:0.05,season:0.8}) : WEEKS.map(()=>0);
+  c.w.productViews = c.w.sessions.map(v=>v*0.42*noise(0.04));
+  c.w.checkout = c.w.cto.map(v=>v*0.62*noise(0.04));
+});
+
+// Paid social by platform
+const SOCIAL = [
+  {name:'Facebook', share:0.30, cpm:5.2, cto:0.014, close:0.27},
+  {name:'Instagram', share:0.36, cpm:6.1, cto:0.017, close:0.26},
+  {name:'TikTok', share:0.24, cpm:4.3, cto:0.012, close:0.2},
+  {name:'Snapchat', share:0.10, cpm:3.8, cto:0.009, close:0.18},
+];
+const socialCh = CHANNELS.find(c=>c.id==='social');
+SOCIAL.forEach(p=>{
+  p.w={};
+  p.w.spend = socialCh.w.spend.map(v=>v*p.share*noise(0.06));
+  p.w.impressions = p.w.spend.map(v=>v/p.cpm*1000*noise(0.05));
+  p.w.sessions = socialCh.w.sessions.map(v=>v*p.share*noise(0.06));
+  p.w.cto = p.w.sessions.map(v=>v*p.cto*0.1*noise(0.06));
+  p.w.orders = p.w.cto.map(v=>v*p.close*noise(0.08));
+});
+// DV360 by line item type
+const DISPLAY = [
+  {name:'Programmatic display', share:0.48, cpm:3.1, ctr:0.0018},
+  {name:'Online video (YouTube & OLV)', share:0.34, cpm:9.5, ctr:0.0009},
+  {name:'Connected TV', share:0.18, cpm:24, ctr:0.0002},
+];
+const dispCh = CHANNELS.find(c=>c.id==='display');
+DISPLAY.forEach(p=>{
+  p.w={};
+  p.w.spend = dispCh.w.spend.map(v=>v*p.share*noise(0.05));
+  p.w.impressions = p.w.spend.map(v=>v/p.cpm*1000);
+  p.w.clicks = p.w.impressions.map(v=>v*p.ctr*noise(0.08));
+  p.w.orders = dispCh.w.orders.map(v=>v*p.share*noise(0.12));
+});
+
+// ---------- Search ----------
+const paidCh = CHANNELS.find(c=>c.id==='paid_search');
+const orgCh = CHANNELS.find(c=>c.id==='organic');
+const SEARCH = {
+  paidImpr: paidCh.w.sessions.map(v=>v*1.08/0.082*noise(0.05)),
+  paidClicks: paidCh.w.sessions.map(v=>v*1.08),
+  paidCost: paidCh.w.spend,
+  orgImpr: orgCh.w.sessions.map(v=>v*1.05/0.046*noise(0.06)),
+  orgClicks: orgCh.w.sessions.map(v=>v*1.05),
+  orgPos: WEEKS.map((_,i)=>6.4+0.6*i/N+(rnd()-0.5)*0.4),
+};
+
+const KEYWORDS = [
+  // kw, brand?, theme, weekly clicks, cpc, ctoRate (per click), close, organic position, IS
+  ['proximus', true, 'Brand', 9800, 0.18, 0.052, 0.40, 1.0, 0.97],
+  ['proximus mobile', true, 'Brand', 2600, 0.24, 0.071, 0.41, 1.1, 0.95],
+  ['proximus abonnement gsm', true, 'Brand', 1500, 0.29, 0.088, 0.42, 1.2, 0.94],
+  ['iphone 18 pro', false, 'Smartphones', 3100, 1.42, 0.038, 0.31, 7.8, 0.41],
+  ['samsung galaxy s26', false, 'Smartphones', 1900, 1.18, 0.034, 0.30, 9.4, 0.38],
+  ['google pixel 11', false, 'Smartphones', 900, 0.96, 0.041, 0.32, 6.1, 0.52],
+  ['smartphone met abonnement', false, 'Smartphones', 1200, 1.65, 0.061, 0.35, 4.2, 0.58],
+  ['abonnement gsm', false, 'Subscriptions', 2800, 2.05, 0.058, 0.37, 3.6, 0.62],
+  ['gsm abonnement vergelijken', false, 'Subscriptions', 1700, 2.38, 0.044, 0.33, 5.3, 0.49],
+  ['forfait mobile belgique', false, 'Subscriptions', 1300, 2.12, 0.049, 0.34, 4.8, 0.55],
+  ['goedkoop gsm abonnement', false, 'Subscriptions', 1600, 1.88, 0.039, 0.29, 8.9, 0.44],
+  ['sim only abonnement', false, 'Subscriptions', 1100, 1.74, 0.052, 0.36, 6.6, 0.47],
+  ['unlimited data abonnement', false, 'Subscriptions', 700, 2.21, 0.064, 0.38, 3.1, 0.66],
+  ['5g abonnement', false, 'Subscriptions', 600, 1.52, 0.047, 0.33, 2.4, 0.71],
+  ['esim belgique', false, 'Options', 450, 0.88, 0.036, 0.40, 2.9, 0.69],
+  ['gsm verzekering', false, 'Options', 380, 1.12, 0.045, 0.44, 4.4, 0.57],
+].map(([kw,brand,theme,clicks,cpc,cto,close,pos,is])=>{
+  const extra = theme==='Smartphones'?PHONE_LAUNCH:null;
+  const w={}; w.clicks=series(clicks,{extra}); w.cost=w.clicks.map(v=>v*cpc*noise(0.06));
+  const ctr=brand?0.3+rnd()*0.06:0.035+rnd()*0.07; w.impr=w.clicks.map(v=>v/ctr*noise(0.05)); w.cto=w.clicks.map(v=>v*cto*0.1*noise(0.08)); w.orders=w.cto.map(v=>v*close*noise(0.1));
+  w.is=WEEKS.map(()=>Math.min(0.99,is*noise(0.05))); w.pos=WEEKS.map(()=>Math.max(1,pos*noise(0.08)));
+  return {kw,brand,theme,w};
+});
+
+// Auction insights (Google Ads, non-brand mobile campaigns)
+const COMPETITORS = [
+  {name:'Proximus (you)', is:0.52, overlap:null, above:null, top:0.71, outrank:null, seo:0.29, sos:0.33, trend:-0.06},
+  {name:'Orange Belgium', is:0.47, overlap:0.68, above:0.44, top:0.66, outrank:0.49, seo:0.23, sos:0.26, trend:0.04},
+  {name:'Telenet', is:0.39, overlap:0.55, above:0.38, top:0.61, outrank:0.56, seo:0.18, sos:0.19, trend:0},
+  {name:'BASE', is:0.31, overlap:0.46, above:0.31, top:0.52, outrank:0.62, seo:0.11, sos:0.08, trend:-0.03},
+  {name:'DIGI', is:0.28, overlap:0.41, above:0.36, top:0.49, outrank:0.64, seo:0.06, sos:0.07, trend:0.35},
+  {name:'Mobile Vikings', is:0.22, overlap:0.33, above:0.27, top:0.45, outrank:0.69, seo:0.07, sos:0.04, trend:0.05},
+  {name:'Coolblue', is:0.19, overlap:0.24, above:0.41, top:0.58, outrank:0.71, seo:0.04, sos:0.02, trend:0.02},
+  {name:'MediaMarkt', is:0.14, overlap:0.18, above:0.35, top:0.47, outrank:0.76, seo:0.02, sos:0.01, trend:0},
+];
+COMPETITORS.forEach(c=>{ c.w = WEEKS.map((_,i)=>Math.min(0.95,c.is*(1+c.trend*(i-N/2)/N)*noise(0.04))); });
+const LOST_IS = { budget: WEEKS.map(()=>0.14*noise(0.15)), rank: WEEKS.map(()=>0.34*noise(0.08)) };
+
+// ---------- Products ----------
+const PLANS = [
+  {name:'Mobile Essential', data:'5 GB', promo:14.99, price:16.99, share:0.12},
+  {name:'Mobile Easy', data:'15 GB', promo:15.99, price:19.99, share:0.22},
+  {name:'Mobile Smart', data:'70 GB', promo:18.99, price:24.99, share:0.38},
+  {name:'Mobile Maxi', data:'140 GB', promo:21.99, price:29.99, share:0.17},
+  {name:'Mobile Unlimited', data:'Unlimited', promo:34.99, price:49.99, share:0.11},
+];
+const PHONES = [
+  ['Apple','iPhone 18 Pro',599,1479.99,0.17,1.9],
+  ['Apple','iPhone 18 Pro Max',null,null,0.09,1.9],
+  ['Apple','iPhone Air',null,null,0.05,1.4],
+  ['Samsung','Galaxy S26 FE',99,799.99,0.12,1.0],
+  ['Samsung','Galaxy S26 + Galaxy Watch9',9,1149.99,0.09,1.0],
+  ['Samsung','Galaxy A57 5G',9,509.99,0.13,1.0],
+  ['Google','Pixel 11',9,899.99,0.07,1.6],
+  ['Google','Pixel 11 Pro',null,null,0.04,1.6],
+  ['Google','Pixel 10a',9,499.99,0.06,1.0],
+  ['Xiaomi','17T Pro',9,999.99,0.05,1.2],
+  ['Xiaomi','Redmi Note 17 Pro',9,499.99,0.08,1.0],
+  ['Xiaomi','Redmi Note 17 Pro Max',9,649.99,0.05,1.0],
+];
+const OPTIONS = [
+  {name:'Smartphone insurance', base:0.11}, {name:'Smartphone protection', base:0.06},
+  {name:'eSIM', base:0.19}, {name:'Kids mobile subscription', base:0.04},
+  {name:'Trade in your phone', base:0.07}, {name:'Prepaid Pay&Go+', base:0.05},
+];
+
+const TOTAL = {};
+['sessions','cto','orders','spend','productViews','checkout'].forEach(k=>{ TOTAL[k]=WEEKS.map((_,i)=>CHANNELS.reduce((s,c)=>s+c.w[k][i],0)); });
+
+// product family split of orders
+const FAMILY = [
+  {name:'SIM-only subscription', share:0.52}, {name:'Smartphone + subscription', share:0.33},
+  {name:'Smartphone only', share:0.06}, {name:'Options & add-ons', share:0.09},
+];
+FAMILY.forEach(f=>{ f.w = TOTAL.orders.map((v,i)=>{ let s=f.share; if(f.name.startsWith('Smartphone')) s*=PHONE_LAUNCH[i]**0.6; return v*s*noise(0.05);}); });
+// normalise to orders
+WEEKS.forEach((_,i)=>{ const s=FAMILY.reduce((a,f)=>a+f.w[i],0); FAMILY.forEach(f=>f.w[i]*=TOTAL.orders[i]/s); });
+
+const subOrders = FAMILY[0].w; // SIM-only subscription orders (smartphone + subscription orders go through the smartphone funnel)
+PLANS.forEach(p=>{ p.w={}; p.w.orders=subOrders.map(v=>v*p.share*noise(0.08)); p.w.cto=p.w.orders.map(v=>v/(0.38+p.share*0.2)*noise(0.05)); const kv=0.75+rnd()*0.5, ki=0.92+rnd()*0.16, ko=0.92+rnd()*0.16; p.w.views=p.w.cto.map(v=>v/(0.018*kv)*noise(0.05));
+  p.w.identify=p.w.cto.map(v=>v*0.72*ki*noise(0.03)); p.w.overview=p.w.identify.map((v,i)=>Math.max(p.w.orders[i]/0.95,v*0.68*ko*noise(0.03))); });
+const phoneOrders = WEEKS.map((_,i)=>FAMILY[1].w[i]+FAMILY[2].w[i]);
+const PHONE_OBJS = PHONES.map(([brand,model,withSub,without,share,launch])=>{
+  const extra = WEEKS.map((_,i)=>PHONE_LAUNCH[i]>1?launch:1);
+  const w={}; w.orders=phoneOrders.map((v,i)=>v*share*extra[i]*noise(0.12));
+  w.cto=w.orders.map(v=>v/0.31*noise(0.06)); w.views=w.cto.map(v=>v/0.011*noise(0.06));
+  w.withSub=w.orders.map(v=>v*(brand==='Apple'?0.88:0.83)*noise(0.03));
+  return {brand,model,withSub,without,w};
+});
+// normalise phones to phoneOrders
+WEEKS.forEach((_,i)=>{ const s=PHONE_OBJS.reduce((a,p)=>a+p.w.orders[i],0); const r=phoneOrders[i]/s; PHONE_OBJS.forEach(p=>{p.w.orders[i]*=r;p.w.withSub[i]*=r;}); });
+PHONE_OBJS.forEach(p=>{ p.w.cto=p.w.orders.map(v=>v/0.31*noise(0.05)); const kv=0.7+rnd()*0.6, ki=0.9+rnd()*0.2, ko=0.9+rnd()*0.2; p.w.views=p.w.cto.map(v=>v/(0.011*kv)*noise(0.06)); p.w.identify=p.w.cto.map(v=>v*0.6*ki*noise(0.03)); p.w.overview=p.w.identify.map((v,i)=>Math.max(p.w.orders[i]/0.95,v*0.62*ko*noise(0.03))); });
+OPTIONS.forEach(o=>{ o.w={}; o.w.orders=TOTAL.orders.map(v=>v*o.base*noise(0.08)); o.w.cto=o.w.orders.map(v=>v*0.12*noise(0.08)); });
+
+// ---------- Organic content groups (real figures from the GSC export supplied) ----------
+const CONTENT_GROUPS = [
+  ['Device Finder PDP',750109,-28.6,53663,-26.3,7.15,3.2,6.83,-19.4],
+  ['Find Number Owner',682483,null,16014,null,2.35,null,5.13,null],
+  ['Standalone Overview',406234,-55.8,14749,-28.4,3.63,61.9,5.99,7.9],
+  ['Device Finder Overview',204557,-77.6,16697,-61.0,8.16,74.1,7.01,-28.5],
+  ['Mobile Pilar',139282,12619.8,3395,169650.0,2.44,1234.5,5.53,-33.0],
+  ['Standalone PDP',90934,null,1260,null,1.39,null,5.81,null],
+  ['eSim',63630,-66.4,4048,-0.8,6.36,195.3,5.6,-21.9],
+  ['5g',22610,13.3,976,247.3,4.32,206.5,21.27,195.7],
+  ['Options',19257,null,150,null,0.78,null,11.15,null],
+  ['Insurance',11711,68.8,2129,377.4,18.18,182.8,4.98,-49.5],
+  ['Kids',6459,null,674,null,10.44,null,7.11,null],
+  ['Protection',3334,null,422,null,12.66,null,7.71,null],
+  ['Composer',1338,-92.3,29,-6.5,2.17,1108.6,10.79,507.7],
+  ['Other',1092,144.8,69,1280.0,6.32,463.6,10.78,-31.5],
+];
+
+function shape(n,amp,trend=0){ const w=[]; for(let i=0;i<n;i++) w.push((1+trend*i/n)*noise(amp)); const s=w.reduce((a,b)=>a+b,0); return w.map(v=>v/s); }
+const SEO_GROUPS = CONTENT_GROUPS.map(([g,I,di,C,dc,ctr,dctr,pos,dpos])=>{
+  const isNew = di==null;
+  const Ip = isNew?0:I/(1+di/100), Cp = isNew?0:C/(1+dc/100), posP = isNew?null:pos/(1+dpos/100);
+  const w={impr:new Array(N).fill(0), clicks:new Array(N).fill(0), posW:new Array(N).fill(0)};
+  const fill=(from,len,Itot,Ctot,p,trend)=>{ if(!Itot) return; const si=shape(len,0.08,trend), sc=si.map(v=>v*noise(0.06)); const scs=sc.reduce((a,b)=>a+b,0);
+    for(let k=0;k<len;k++){ const i=from+k; w.impr[i]=Itot*si[k]; w.clicks[i]=Ctot*sc[k]/scs; w.posW[i]=w.impr[i]*p*noise(0.04); }
+    // re-anchor impression-weighted position to target
+    const sI=w.impr.slice(from,from+len).reduce((a,b)=>a+b,0), sP=w.posW.slice(from,from+len).reduce((a,b)=>a+b,0); const r=p*sI/sP; for(let k=0;k<len;k++) w.posW[from+k]*=r; };
+  fill(N-13,13,I,C,pos,0.1);
+  if(!isNew){ fill(N-26,13,Ip,Cp,posP,0); fill(0,26,Ip*2*0.97,Cp*2*0.97,posP*1.02,0.05); }
+  return {g,isNew,w};
+});
+
+// ---------- Organic social ----------
+const ORG_SOCIAL = [
+  {name:'Instagram', followers:198000, growth:0.012, posts:6, reach:0.42, er:0.031, lc:0.006},
+  {name:'Facebook', followers:312000, growth:0.002, posts:5, reach:0.21, er:0.012, lc:0.009},
+  {name:'TikTok', followers:86000, growth:0.035, posts:4, reach:1.35, er:0.054, lc:0.0015},
+  {name:'LinkedIn', followers:142000, growth:0.006, posts:3, reach:0.18, er:0.022, lc:0.011},
+  {name:'YouTube', followers:54000, growth:0.008, posts:1, reach:0.9, er:0.018, lc:0.004},
+];
+const orgSocCh = CHANNELS.find(c=>c.id==='org_social');
+ORG_SOCIAL.forEach((p,pi)=>{
+  p.w={}; let f=p.followers*Math.pow(1-p.growth/4,N);
+  p.w.followers=WEEKS.map(()=>{ f*=1+p.growth/4*noise(0.5); return f; });
+  p.w.posts=WEEKS.map(()=>Math.max(0,Math.round(p.posts*noise(0.35))));
+  p.w.reach=WEEKS.map((_,i)=>p.w.followers[i]*p.reach*(p.w.posts[i]/p.posts||0.3)*MARKET[i]*noise(0.12));
+  p.w.impressions=p.w.reach.map(v=>v*1.6*noise(0.05));
+  p.w.engagements=p.w.impressions.map(v=>v*p.er*noise(0.12));
+  p.w.linkClicks=p.w.impressions.map(v=>v*p.lc*1.5*noise(0.12));
+});
+WEEKS.forEach((_,i)=>{ const s=ORG_SOCIAL.reduce((a,p)=>a+p.w.linkClicks[i],0); ORG_SOCIAL.forEach(p=>{ const sh=p.w.linkClicks[i]/s; p.w.sessions=p.w.sessions||[]; p.w.cto=p.w.cto||[]; p.w.orders=p.w.orders||[];
+  p.w.sessions[i]=orgSocCh.w.sessions[i]*sh; p.w.cto[i]=orgSocCh.w.cto[i]*sh; p.w.orders[i]=orgSocCh.w.orders[i]*sh; }); });
+
+const POST_TEMPLATES = [
+  ['iPhone 18 Pro is here — order now with a subscription','Reel','Smartphones'],['Mobile Smart 70 GB: 1-year discount','Carousel','Subscriptions'],
+  ['5G coverage: how fast is your street?','Video','Network'],['How to activate your eSIM in 2 minutes','Reel','Options'],
+  ['First phone for your kids: our tips','Carousel','Subscriptions'],['Galaxy S26 FE + €100 cashback','Image','Smartphones'],
+  ['Behind the scenes: our network team','Video','Brand'],['Roaming this summer: what is included','Carousel','Customer'],
+  ['Pixel 11 + Google Home Speaker offer','Image','Smartphones'],['Trade in your old phone, save up to €300','Reel','Options'],
+  ['Unlimited data — 5G+ up to 1 Gbps','Reel','Subscriptions'],['Fraudulent calls & SMS filtering explained','Video','Customer'],
+  ['Smartphone insurance: cracked screen covered','Image','Options'],['Customer story: switching to Proximus','Video','Brand'],
+];
+const POSTS=[]; for(let i=0;i<60;i++){ const t=POST_TEMPLATES[i%POST_TEMPLATES.length]; const p=ORG_SOCIAL[Math.floor(rnd()*ORG_SOCIAL.length)];
+  const fmt = p.name==='TikTok'?'Video':p.name==='YouTube'?'Video':t[1]; const wk=N-1-Math.floor(rnd()*30);
+  const boost = (fmt==='Reel'||fmt==='Video'?1.5:1)*(t[2]==='Smartphones'?1.3:1);
+  const reach = p.followers*p.reach/p.posts*boost*noise(0.5); const eng=reach*1.5*p.er*boost*noise(0.3); const lc=reach*1.5*p.lc*1.5*(t[2]==='Brand'?0.4:1.2)*noise(0.35);
+  POSTS.push({title:t[0],format:fmt,theme:t[2],platform:p.name,week:wk,reach,eng,er:eng/reach,lc,sessions:lc*0.82,cto:lc*0.82*(t[2]==='Smartphones'||t[2]==='Subscriptions'?0.003:0.0008)}); }
+
+// ---------- helpers ----------
+const $ = (s,el=document)=>el.querySelector(s);
+const sum = a=>a.reduce((x,y)=>x+y,0);
+const avg = a=>a.length?sum(a)/a.length:0;
+let PERIOD = 13;
+const cur = a=>a.slice(N-PERIOD);
+const prev = a=>a.slice(N-2*PERIOD, N-PERIOD);
+const fmtInt = v=>Math.round(v).toLocaleString('en-GB');
+const fmtK = v=>Math.abs(v)>=1e6?(v/1e6).toFixed(2)+'M':Math.abs(v)>=1e4?(v/1e3).toFixed(1)+'K':fmtInt(v);
+const fmtEur = v=>'€'+(Math.abs(v)>=1e6?(v/1e6).toFixed(2)+'M':Math.abs(v)>=1e4?(v/1e3).toFixed(1)+'K':Math.abs(v)>=100?Math.round(v).toLocaleString('en-GB'):v.toFixed(2));
+const fmtPrice = v=>'€'+v.toLocaleString('en-GB',{minimumFractionDigits:v%1?2:0,maximumFractionDigits:2});
+const fmtPct = (v,d=1)=>(v*100).toFixed(d)+'%';
+const div0 = (a,b)=>b?a/b:0;
+function delta(c,p,{inverse=false,pp=false}={}){
+  if(p==null||!isFinite(p)||p===0) return '<span class="delta flat">–</span>';
+  const d = pp? (c-p)*100 : (c/p-1)*100;
+  const good = inverse? d<0 : d>0;
+  const cls = Math.abs(d)<0.5?'flat':good?'up':'down';
+  const arrow = d>0?'▲':d<0?'▼':'';
+  return `<span class="delta ${cls}">${arrow} ${Math.abs(d).toLocaleString('en-GB',{minimumFractionDigits:1,maximumFractionDigits:1})}${pp?' pp':'%'}</span>`;
+}
+const CSSV = n=>getComputedStyle(document.body).getPropertyValue(n).trim();
+const SER = i=>`var(--series-${i})`;
+
+// ---------- tooltip ----------
+const tip = document.createElement('div'); tip.className='tip'; document.body.appendChild(tip);
+function showTip(html,ev){ tip.innerHTML=html; tip.style.display='block'; const r=tip.getBoundingClientRect(); let x=ev.clientX+14, y=ev.clientY+14; if(x+r.width>innerWidth-8)x=ev.clientX-r.width-14; if(y+r.height>innerHeight-8)y=ev.clientY-r.height-14; tip.style.left=x+'px'; tip.style.top=y+'px'; }
+function hideTip(){ tip.style.display='none'; }
+const sw = c=>`<i class="sw" style="background:${c}"></i>`;
+
+// ---------- charts ----------
+function niceMax(v){ if(v<=0) return 1; const p=Math.pow(10,Math.floor(Math.log10(v))); const n=v/p; return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p; }
+function legend(series){ return series.length<2?'':`<div class="legend">${series.map(s=>`<span>${sw(s.color)}${s.name}</span>`).join('')}</div>`; }
+
+function lineChart(el, labels, series, fmt=fmtK, {h=240, yMin=null, yMaxFixed=null, invert=false}={}){
+  const W = el.clientWidth||600, H=h, m={t:12,r:16,b:26,l:52};
+  const all = series.flatMap(s=>s.values);
+  let lo = yMin??0, hi = yMaxFixed??niceMax(Math.max(...all)*1.05);
+  if(yMin!=null && yMaxFixed==null){ hi = Math.max(...all)*1.05; }
+  const x = i=>m.l + (labels.length===1?0:i*(W-m.l-m.r)/(labels.length-1));
+  const y = v=>{ const t=(v-lo)/(hi-lo); return invert? m.t + t*(H-m.t-m.b) : H-m.b - t*(H-m.t-m.b); };
+  let g='';
+  for(let k=0;k<=4;k++){ const v=lo+(hi-lo)*k/4, yy=y(v); g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${yy}" y2="${yy}" class="grid"/><text x="${m.l-8}" y="${yy+4}" class="axis" text-anchor="end">${fmt(v)}</text>`; }
+  const step = Math.ceil(labels.length/ Math.max(2,Math.floor((W-m.l-m.r)/70)));
+  labels.forEach((l,i)=>{ if(i%step===0) g+=`<text x="${x(i)}" y="${H-6}" class="axis" text-anchor="middle">${l}</text>`; });
+  series.forEach(s=>{ const d=s.values.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(''); g+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" ${s.dash?'stroke-dasharray="4 4"':''}/>`; });
+  // end labels for <=4 series
+  if(series.length>1 && series.length<=4){ series.forEach(s=>{ const i=s.values.length-1; g+=`<circle cx="${x(i)}" cy="${y(s.values[i])}" r="4" fill="${s.color}" stroke="var(--surface-1)" stroke-width="2"/>`; }); }
+  g+=`<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" style="display:none"/>`;
+  g+=`<g class="dots"></g><rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent" class="hit"/>`;
+  el.innerHTML = legend(series)+`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg>`;
+  const svg=el.querySelector('svg'), xh=svg.querySelector('.xh'), dots=svg.querySelector('.dots');
+  svg.querySelector('.hit').addEventListener('mousemove',ev=>{
+    const r=svg.getBoundingClientRect(); const px=ev.clientX-r.left; const i=Math.max(0,Math.min(labels.length-1,Math.round((px-m.l)/((W-m.l-m.r)/(labels.length-1||1)))));
+    xh.setAttribute('x1',x(i)); xh.setAttribute('x2',x(i)); xh.style.display='';
+    dots.innerHTML=series.map(s=>`<circle cx="${x(i)}" cy="${y(s.values[i])}" r="4.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="2"/>`).join('');
+    showTip(`<b>${s0(labels[i])}</b>`+series.map(s=>`<div>${sw(s.color)}${s.name}<span>${fmt(s.values[i])}</span></div>`).join(''),ev);
+  });
+  svg.querySelector('.hit').addEventListener('mouseleave',()=>{xh.style.display='none';dots.innerHTML='';hideTip();});
+}
+const s0 = l=>'Week of '+l;
+
+function hbar(el, rows, fmt=fmtK, {color=SER(1), labelW=170}={}){
+  const W=el.clientWidth||500, rowH=30, H=rows.length*rowH+8, m={l:labelW,r:70};
+  const mx=Math.max(...rows.map(r=>r.value))||1;
+  let g='';
+  rows.forEach((r,i)=>{ const y=i*rowH+6, w=Math.max(2,(W-m.l-m.r)*r.value/mx);
+    g+=`<text x="${m.l-10}" y="${y+15}" class="lab" text-anchor="end">${r.label}</text>`;
+    g+=`<path d="M${m.l},${y+3} h${w-4} a4,4 0 0 1 4,4 v10 a4,4 0 0 1 -4,4 h${-(w-4)} z" fill="${r.color||color}" class="bar" data-i="${i}"/>`;
+    g+=`<text x="${m.l+w+8}" y="${y+15}" class="val">${fmt(r.value)}</text>`;
+    g+=`<rect x="0" y="${y}" width="${W}" height="${rowH-2}" fill="transparent" class="hitbar" data-i="${i}"/>`;
+  });
+  el.innerHTML=`<svg width="${W}" height="${H}">${g}</svg>`;
+  el.querySelectorAll('.hitbar').forEach(b=>{ const r=rows[+b.dataset.i];
+    b.addEventListener('mousemove',ev=>{ showTip(`<b>${r.label}</b><div>${r.tip||fmt(r.value)}</div>`,ev); el.querySelectorAll('.bar').forEach(x=>x.style.opacity=x.dataset.i===b.dataset.i?1:.45); });
+    b.addEventListener('mouseleave',()=>{hideTip();el.querySelectorAll('.bar').forEach(x=>x.style.opacity=1);});
+  });
+}
+
+function stackedCols(el, labels, series, fmt=fmtK, {h=240}={}){
+  const W=el.clientWidth||600, H=h, m={t:12,r:12,b:26,l:52};
+  const totals=labels.map((_,i)=>sum(series.map(s=>s.values[i])));
+  const hi=niceMax(Math.max(...totals)*1.04);
+  const bw=(W-m.l-m.r)/labels.length, barW=Math.max(3,bw-3);
+  const y=v=>H-m.b-v/hi*(H-m.t-m.b);
+  let g='';
+  for(let k=0;k<=4;k++){ const v=hi*k/4,yy=y(v); g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${yy}" y2="${yy}" class="grid"/><text x="${m.l-8}" y="${yy+4}" class="axis" text-anchor="end">${fmt(v)}</text>`; }
+  const step=Math.ceil(labels.length/Math.max(2,Math.floor((W-m.l-m.r)/70)));
+  labels.forEach((l,i)=>{ const x0=m.l+i*bw+(bw-barW)/2; let acc=0;
+    series.forEach((s,si)=>{ const v=s.values[i]; const y1=y(acc+v), y0=y(acc); const hh=Math.max(0,y0-y1-(si?2:0));
+      if(si===series.length-1){ const r=Math.min(3,barW/2,hh); g+=`<path d="M${x0},${y0-(si?2:0)} v${-(hh-r)} a${r},${r} 0 0 1 ${r},${-r} h${barW-2*r} a${r},${r} 0 0 1 ${r},${r} v${hh-r} z" fill="${s.color}"/>`; }
+      else g+=`<rect x="${x0}" y="${y1}" width="${barW}" height="${hh}" fill="${s.color}"/>`;
+      acc+=v; });
+    if(i%step===0) g+=`<text x="${x0+barW/2}" y="${H-6}" class="axis" text-anchor="middle">${l}</text>`;
+    g+=`<rect x="${m.l+i*bw}" y="${m.t}" width="${bw}" height="${H-m.t-m.b}" fill="transparent" class="hitc" data-i="${i}"/>`;
+  });
+  el.innerHTML=legend(series)+`<svg width="${W}" height="${H}">${g}</svg>`;
+  el.querySelectorAll('.hitc').forEach(b=>{ const i=+b.dataset.i;
+    b.addEventListener('mousemove',ev=>showTip(`<b>${s0(labels[i])}</b>`+series.slice().reverse().map(s=>`<div>${sw(s.color)}${s.name}<span>${fmt(s.values[i])}</span></div>`).join('')+`<div class="tt-total">Total<span>${fmt(totals[i])}</span></div>`,ev));
+    b.addEventListener('mouseleave',hideTip);
+  });
+}
+
+function segBar(el, segs, fmt=v=>fmtPct(v,0)){
+  el.innerHTML=`<div class="segbar">${segs.map(s=>`<div style="flex:${s.value};background:${s.color}" data-t="${s.label}: ${fmt(s.value)}"></div>`).join('')}</div>
+  <div class="legend">${segs.map(s=>`<span>${sw(s.color)}${s.label} <b>${fmt(s.value)}</b></span>`).join('')}</div>`;
+  el.querySelectorAll('.segbar div').forEach(d=>{d.addEventListener('mousemove',ev=>showTip(d.dataset.t,ev));d.addEventListener('mouseleave',hideTip);});
+}
+
+// sortable table
+function table(el, cols, rows, {sortKey=null, desc=true, foot=null}={}){
+  let sk=sortKey, sd=desc;
+  function draw(){
+    const rs = sk==null?rows:rows.slice().sort((a,b)=>{const va=a[sk],vb=b[sk]; if(typeof va==='string') return sd?vb.localeCompare(va):va.localeCompare(vb); return sd?(vb??-1e18)-(va??-1e18):(va??1e18)-(vb??1e18);});
+    el.innerHTML=`<div class="tbl-wrap"><table><thead><tr>${cols.map(c=>`<th class="${c.num?'num':''} ${c.key===sk?'sorted':''}" data-k="${c.key}">${c.label}${c.key===sk?(sd?' ↓':' ↑'):''}</th>`).join('')}</tr></thead>
+    <tbody>${rs.map(r=>`<tr>${cols.map(c=>`<td class="${c.num?'num':''}">${c.render?c.render(r):r[c.key]}</td>`).join('')}</tr>`).join('')}</tbody>
+    ${foot?`<tfoot><tr>${cols.map(c=>`<td class="${c.num?'num':''}">${foot[c.key]??''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
+    el.querySelectorAll('th').forEach(th=>th.addEventListener('click',()=>{ const k=th.dataset.k; if(sk===k) sd=!sd; else {sk=k; sd=true;} draw(); }));
+  }
+  draw();
+}
+const barCell = (v,mx,txt)=>`<div class="cellbar"><i><span style="width:${Math.max(1,v/mx*100)}%"></span></i><em>${txt}</em></div>`;
+
+function kpi(label, value, deltaHtml, sub=''){ return `<div class="kpi"><div class="kpi-l">${label}</div><div class="kpi-v">${value}</div><div class="kpi-d">${deltaHtml} <span class="muted">vs prev. period</span></div>${sub?`<div class="kpi-s">${sub}</div>`:''}</div>`; }
+const card = (id,title,sub='',cls='')=>`<section class="card ${cls}"><header><h3>${title}</h3>${sub?`<p>${sub}</p>`:''}</header><div id="${id}"></div></section>`;
+
+
+// ---------- filter layer ----------
+const RAW = {CHANNELS,SOCIAL,DISPLAY,SEARCH,KEYWORDS,PLANS,PHONE_OBJS,OPTIONS,FAMILY,SEO_GROUPS,ORG_SOCIAL};
+const FILTER = {channels:new Set(CHANNELS.map(c=>c.id)), device:'all', lang:'all'};
+const DEV = {all:[1,1,1], mobile:[.68,.52,.71], desktop:[.27,.42,.24], tablet:[.05,.06,.05]};
+const LANG = {all:[1,1,1], nl:[.58,.6,.57], fr:[.38,.37,.39], en:[.04,.03,.04]};
+const NOSCALE = new Set(['is','pos','orgPos','followers','posts','reach','engagements','linkClicks']);
+const kindOf = k => /^(cto|checkout|orders|withSub|identify|overview)$/.test(k)?1 : /^(spend|cost|paidCost)$/.test(k)?2 : 0;
+function fac(kind,i){ const d=DEV[FILTER.device][kind]*LANG[FILTER.lang][kind]; if(d===1) return 1; return d*(1+0.035*Math.sin(i*1.37+kind*2+(FILTER.device.length+FILTER.lang.length))); }
+function scaleArr(arr,k,extra){ const kind=kindOf(k); return arr.map((v,i)=>v*fac(kind,i)*(extra?extra[i]:1)); }
+function scaleW(w,{skip=[],extra=null}={}){ const o={}; for(const k in w){ o[k]= (NOSCALE.has(k)||skip.includes(k))? w[k].slice() : scaleArr(w[k],k,extra); } return o; }
+const cloneList = (list,opt)=>list.map(o=>({...o, w: Array.isArray(o.w)? scaleArr(o.w,'orders',opt&&opt.extra) : scaleW(o.w,opt)}));
+const V = {};
+function applyFilters(){
+  // NB: organic social reach/engagement are platform metrics and are not split by device/language
+  V.CHANNELS_ALL = cloneList(RAW.CHANNELS);
+  V.CHANNELS = V.CHANNELS_ALL.filter(c=>FILTER.channels.has(c.id));
+  const tot = list=>{ const t={}; ['sessions','cto','orders','spend','productViews','checkout'].forEach(k=>{ t[k]=WEEKS.map((_,i)=>list.reduce((s,c)=>s+c.w[k][i],0)); }); return t; };
+  V.TOTAL = tot(V.CHANNELS); V.TOTAL_ALL = tot(V.CHANNELS_ALL);
+  const ratio = WEEKS.map((_,i)=>div0(V.TOTAL.orders[i],V.TOTAL_ALL.orders[i]));
+  V.paidCh = V.CHANNELS_ALL.find(c=>c.id==='paid_search'); V.orgCh = V.CHANNELS_ALL.find(c=>c.id==='organic');
+  V.SOCIAL = cloneList(RAW.SOCIAL); V.DISPLAY = cloneList(RAW.DISPLAY);
+  V.SEARCH = scaleW(RAW.SEARCH); V.KEYWORDS = cloneList(RAW.KEYWORDS);
+  V.PLANS = cloneList(RAW.PLANS,{extra:ratio}); V.PHONE_OBJS = cloneList(RAW.PHONE_OBJS,{extra:ratio});
+  V.OPTIONS = cloneList(RAW.OPTIONS,{extra:ratio}); V.FAMILY = cloneList(RAW.FAMILY,{extra:ratio});
+  V.SEO = cloneList(RAW.SEO_GROUPS); V.ORG_SOCIAL = cloneList(RAW.ORG_SOCIAL);
+}
+const CH_COLOR = {}; ['paid_search','organic','social','direct','email'].forEach((id,i)=>CH_COLOR[id]=SER(i+1));
+
+// ---------- aggregates ----------
+function agg(w){ const o={},p={}; for(const k in w){ o[k]=sum(cur(w[k])); p[k]=sum(prev(w[k])); } return [o,p]; }
+
+// ---------- TABS ----------
+const TABS = [
+  ['overview','Overview'],['channels','Channels & media'],['search','Search: paid vs organic'],['keywords','Keywords'],['share','Search market share'],['seo','SEO content groups'],['social','Social'],['products','Products'],['funnel','Order funnel'],['sources','Data sources & definitions']
+];
+let ACTIVE='overview';
+
+function renderOverview(root){
+  const [c,p]=agg(V.TOTAL);
+  const cr=div0(c.orders,c.sessions), crp=div0(p.orders,p.sessions);
+  const close=div0(c.orders,c.cto), closep=div0(p.orders,p.cto);
+  root.innerHTML=`<div class="kpis">
+    ${kpi('Sessions',fmtK(c.sessions),delta(c.sessions,p.sessions))}
+    ${kpi('Call to Order clicks',fmtK(c.cto),delta(c.cto,p.cto),`CTO rate ${fmtPct(div0(c.cto,c.sessions),2)}`)}
+    ${kpi('Orders',fmtK(c.orders),delta(c.orders,p.orders))}
+    ${kpi('Conversion rate',fmtPct(cr,2),delta(cr,crp,{pp:true}),'Orders ÷ sessions')}
+    ${kpi('CTO → Order rate',fmtPct(close,1),delta(close,closep,{pp:true}),'Orders ÷ Call to Order')}
+    ${kpi('Paid media spend',fmtEur(c.spend),delta(c.spend,p.spend,{inverse:true}),'Search, social, DV360')}
+    ${kpi('Blended cost per order',fmtEur(div0(c.spend,c.orders)),delta(div0(c.spend,c.orders),div0(p.spend,p.orders),{inverse:true}))}
+  </div>
+  <div class="grid3">${card('ov-ses','Sessions per week','Current period vs previous period (dashed)')}${card('ov-cto','Call to Order clicks per week','Current period vs previous period (dashed)')}${card('ov-ord','Orders per week','Current period vs previous period (dashed)')}</div>
+  <div class="grid2">${card('ov-funnel','Conversion funnel','Selected channels and period')}${card('ov-fam','Orders by product family','Share of orders, selected period')}</div>
+  ${card('ov-ch','Channel summary','Click a column header to sort')}`;
+  const lab=cur(WEEK_LABELS);
+  lineChart($('#ov-ses'),lab,[{name:'Current period',values:cur(V.TOTAL.sessions),color:SER(1)},{name:'Previous period',values:prev(V.TOTAL.sessions),color:'var(--text-muted)',dash:1}]);
+  lineChart($('#ov-cto'),lab,[{name:'Current period',values:cur(V.TOTAL.cto),color:SER(1)},{name:'Previous period',values:prev(V.TOTAL.cto),color:'var(--text-muted)',dash:1}]);
+  lineChart($('#ov-ord'),lab,[{name:'Current period',values:cur(V.TOTAL.orders),color:SER(1)},{name:'Previous period',values:prev(V.TOTAL.orders),color:'var(--text-muted)',dash:1}]);
+  const steps=[['Sessions',c.sessions],['Product page views',c.productViews],['Call to Order',c.cto],['Checkout started',c.checkout],['Orders',c.orders]];
+  hbar($('#ov-funnel'),steps.map(([l,v],i)=>({label:l,value:v,tip:`${fmtInt(v)}${i?` · ${fmtPct(v/steps[i-1][1],1)} of previous step`:''}`})),fmtK,{labelW:140});
+  hbar($('#ov-fam'),V.FAMILY.map(f=>{const v=sum(cur(f.w));return {label:f.name,value:v,tip:`${fmtInt(v)} orders · ${fmtPct(v/c.orders)} of total`}}),fmtK,{labelW:190,color:SER(7)});
+  const rows=V.CHANNELS.map(ch=>{const [a,b]=agg(ch.w); return {name:ch.name,group:ch.group,sessions:a.sessions,cto:a.cto,orders:a.orders,cr:div0(a.orders,a.sessions),close:div0(a.orders,a.cto),spend:a.spend||null,cpo:a.spend?a.spend/a.orders:null,dOrders:div0(a.orders,b.orders)-1,_p:b};});
+  const mx=Math.max(...rows.map(r=>r.orders));
+  table($('#ov-ch'),[
+    {key:'name',label:'Channel'},{key:'group',label:'Group'},
+    {key:'sessions',label:'Sessions',num:1,render:r=>fmtInt(r.sessions)},
+    {key:'cto',label:'Call to Order',num:1,render:r=>fmtInt(r.cto)},
+    {key:'orders',label:'Orders',num:1,render:r=>barCell(r.orders,mx,fmtInt(r.orders))},
+    {key:'dOrders',label:'Δ Orders',num:1,render:r=>delta(r.orders,r._p.orders)},
+    {key:'cr',label:'Conv. rate',num:1,render:r=>fmtPct(r.cr,2)},
+    {key:'close',label:'CTO → Order',num:1,render:r=>fmtPct(r.close,1)},
+    {key:'spend',label:'Spend',num:1,render:r=>r.spend?fmtEur(r.spend):'–'},
+    {key:'cpo',label:'Cost / order',num:1,render:r=>r.cpo?fmtEur(r.cpo):'–'},
+  ],rows,{sortKey:null,foot:{name:'Total',sessions:fmtInt(c.sessions),cto:fmtInt(c.cto),orders:fmtInt(c.orders),cr:fmtPct(cr,2),close:fmtPct(close,1),spend:fmtEur(c.spend),cpo:fmtEur(c.spend/c.orders)}});
+}
+
+function renderChannels(root){
+  root.innerHTML=`<div class="grid2">${card('ch-ord','Orders by channel')}${card('ch-cr','Conversion rate by channel','Orders ÷ sessions')}</div>
+  ${card('ch-ses','Weekly sessions by channel','Paid search, organic search, paid social, direct, email — other channels grouped')}
+  <div class="grid2">${card('ch-stack','Weekly orders by channel','Paid search, organic search, paid social, direct, email — other channels grouped')}${card('ch-cto','Weekly Call to Order by channel','Same channels')}</div>
+  <div class="grid2">${card('ch-paid','Paid media efficiency','Cost per Call to Order and cost per order')}${card('ch-ai','AI assistants — sessions per week','ChatGPT, Perplexity, Gemini, Copilot referrals')}</div>
+  <div class="grid2">${card('ch-social','Paid social by platform','Meta (Facebook, Instagram), TikTok, Snapchat')}${card('ch-dv','Display & video (DV360)','By line-item type')}</div>`;
+  const rows=V.CHANNELS.map(ch=>{const [a]=agg(ch.w);return {ch,a}});
+  if(!rows.length){ root.innerHTML='<div class="callout">No channel selected — pick at least one channel in the filter bar.</div>'; return; }
+  hbar($('#ch-ord'),rows.map(r=>({label:r.ch.name,value:r.a.orders})),fmtK);
+  hbar($('#ch-cr'),rows.map(r=>({label:r.ch.name,value:div0(r.a.orders,r.a.sessions)})),v=>fmtPct(v,2),{color:SER(3)});
+  const main=V.CHANNELS.filter(c=>CH_COLOR[c.id]), other=V.CHANNELS.filter(c=>!CH_COLOR[c.id]);
+  const mk=k=>[...main.map(c=>({name:c.name,color:CH_COLOR[c.id],values:cur(c.w[k])})), ...(other.length?[{name:'Other channels',color:'var(--neutral-bar)',values:cur(WEEKS.map((_,i)=>sum(other.map(c=>c.w[k][i]))))}]:[])];
+  stackedCols($('#ch-ses'),cur(WEEK_LABELS),mk('sessions'));
+  stackedCols($('#ch-stack'),cur(WEEK_LABELS),mk('orders'));
+  stackedCols($('#ch-cto'),cur(WEEK_LABELS),mk('cto'));
+  const paid=V.CHANNELS.filter(c=>c.spend).map(ch=>{const [a,b]=agg(ch.w);return {name:ch.name,spend:a.spend,cto:a.cto,orders:a.orders,cpcto:a.spend/a.cto,cpo:a.spend/a.orders,_p:b}});
+  if(paid.length) table($('#ch-paid'),[{key:'name',label:'Channel'},{key:'spend',label:'Spend',num:1,render:r=>fmtEur(r.spend)},{key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)},{key:'orders',label:'Orders',num:1,render:r=>fmtInt(r.orders)},{key:'cpcto',label:'Cost / CTO',num:1,render:r=>fmtEur(r.cpcto)},{key:'cpo',label:'Cost / order',num:1,render:r=>`${fmtEur(r.cpo)} ${delta(r.cpo,r._p.spend/r._p.orders,{inverse:true})}`}],paid);
+  else $('#ch-paid').innerHTML='<p class="note">No paid channel in the current selection.</p>';
+  const ai=V.CHANNELS_ALL.find(c=>c.id==='ai');
+  lineChart($('#ch-ai'),cur(WEEK_LABELS),[{name:'Sessions',values:cur(ai.w.sessions),color:SER(7)}],fmtK,{h:200});
+  const soc=V.SOCIAL.map(p=>{const [a,b]=agg(p.w);return {name:p.name,spend:a.spend,impressions:a.impressions,cto:a.cto,orders:a.orders,cpm:a.spend/a.impressions*1000,cpo:a.spend/a.orders,_p:b}});
+  table($('#ch-social'),[{key:'name',label:'Platform'},{key:'spend',label:'Spend',num:1,render:r=>fmtEur(r.spend)},{key:'impressions',label:'Impr.',num:1,render:r=>fmtK(r.impressions)},{key:'cpm',label:'CPM',num:1,render:r=>fmtEur(r.cpm)},{key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)},{key:'orders',label:'Orders',num:1,render:r=>fmtInt(r.orders)},{key:'cpo',label:'Cost / order',num:1,render:r=>fmtEur(r.cpo)}],soc,{sortKey:'spend'});
+  const dv=V.DISPLAY.map(p=>{const [a]=agg(p.w);return {name:p.name,spend:a.spend,impressions:a.impressions,clicks:a.clicks,ctr:a.clicks/a.impressions,orders:a.orders,cpo:a.spend/a.orders}});
+  table($('#ch-dv'),[{key:'name',label:'Line-item type'},{key:'spend',label:'Spend',num:1,render:r=>fmtEur(r.spend)},{key:'impressions',label:'Impr.',num:1,render:r=>fmtK(r.impressions)},{key:'ctr',label:'CTR',num:1,render:r=>fmtPct(r.ctr,2)},{key:'orders',label:'Orders*',num:1,render:r=>fmtInt(r.orders)},{key:'cpo',label:'Cost / order',num:1,render:r=>fmtEur(r.cpo)}],dv,{sortKey:'spend'});
+  $('#ch-dv').insertAdjacentHTML('beforeend','<p class="note">* Orders on DV360 include post-view conversions (Floodlight, 1-day view window). Compare with GA4 last-click before drawing conclusions.</p>');
+}
+
+const SOC_COLOR = {Instagram:SER(1),Facebook:SER(2),TikTok:SER(3),LinkedIn:SER(4),YouTube:SER(5)};
+let SOC_PLATFORM='All';
+function renderSocial(root){
+  const plats=V.ORG_SOCIAL.filter(p=>SOC_PLATFORM==='All'||p.name===SOC_PLATFORM);
+  const S=k=>WEEKS.map((_,i)=>sum(plats.map(p=>p.w[k][i])));
+  const tot={}; ['posts','reach','impressions','engagements','linkClicks','sessions','cto','orders'].forEach(k=>tot[k]=S(k));
+  const c={},p={}; for(const k in tot){c[k]=sum(cur(tot[k]));p[k]=sum(prev(tot[k]));}
+  const fol=sum(plats.map(x=>x.w.followers[N-1])), folStart=sum(plats.map(x=>x.w.followers[N-PERIOD-1]));
+  const er=div0(c.engagements,c.impressions), erp=div0(p.engagements,p.impressions);
+  const paidSoc=V.CHANNELS_ALL.find(x=>x.id==='social'), orgSoc=V.CHANNELS_ALL.find(x=>x.id==='org_social');
+  root.innerHTML=`<div class="filters"><label>Platform</label>${['All',...RAW.ORG_SOCIAL.map(x=>x.name)].map(t=>`<button class="chip ${t===SOC_PLATFORM?'on':''}" data-t="${t}">${t}</button>`).join('')}</div>
+  <div class="kpis">
+    ${kpi('Followers',fmtK(fol),delta(fol,folStart),`+${fmtK(fol-folStart)} in period`)}
+    ${kpi('Posts published',fmtInt(c.posts),delta(c.posts,p.posts))}
+    ${kpi('Reach',fmtK(c.reach),delta(c.reach,p.reach))}
+    ${kpi('Engagements',fmtK(c.engagements),delta(c.engagements,p.engagements),'Likes, comments, shares, saves')}
+    ${kpi('Engagement rate',fmtPct(er,2),delta(er,erp,{pp:true}),'Engagements ÷ impressions')}
+    ${kpi('Link clicks',fmtK(c.linkClicks),delta(c.linkClicks,p.linkClicks),`CTR ${fmtPct(div0(c.linkClicks,c.impressions),2)}`)}
+    ${kpi('Sessions on site',fmtK(c.sessions),delta(c.sessions,p.sessions),'GA4, organic social')}
+    ${kpi('Call to Order',fmtInt(c.cto),delta(c.cto,p.cto),`${fmtInt(c.orders)} orders`)}
+  </div>
+  <div class="grid2">${card('so-reach','Reach per week by platform','Organic posts only')}${card('so-er','Engagement rate per week','Engagements ÷ impressions')}</div>
+  <div class="grid2">${card('so-funnel','From social to order','Organic social, selected period')}${card('so-site','Social traffic to the site','Sessions per week — organic vs paid social (GA4)')}</div>
+  ${card('so-plat','Platforms — activity & engagement to site','Sessions, CTO and orders from GA4 (utm_source per platform)')}
+  <div class="grid2">${card('so-fmt','Engagement rate by format','Posts published in the selected period')}${card('so-theme','Sessions to site by content theme','Posts published in the selected period')}</div>
+  ${card('so-posts','Top posts','Posts published in the selected period — sort by any column')}`;
+  root.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{SOC_PLATFORM=b.dataset.t;renderSocial(root);}));
+  const lab=cur(WEEK_LABELS);
+  lineChart($('#so-reach'),lab,plats.map(x=>({name:x.name,values:cur(x.w.reach),color:SOC_COLOR[x.name]})));
+  lineChart($('#so-er'),lab,[{name:'Engagement rate',values:cur(tot.engagements).map((v,i)=>div0(v,cur(tot.impressions)[i])),color:SER(7)}],v=>fmtPct(v,1),{h:240});
+  const st=[['Impressions',c.impressions],['Engagements',c.engagements],['Link clicks',c.linkClicks],['Sessions on site',c.sessions],['Call to Order',c.cto],['Orders',c.orders]];
+  hbar($('#so-funnel'),st.map(([l,v],i)=>({label:l,value:v,tip:`${fmtInt(v)}${i?` · ${fmtPct(v/st[i-1][1],1)} of previous step`:''}`})),fmtK,{labelW:130,color:SER(7)});
+  $('#so-funnel').insertAdjacentHTML('beforeend','<p class="note">Bars are on a linear scale; hover a bar for the step-to-step rate.</p>');
+  lineChart($('#so-site'),lab,[{name:'Organic social',values:cur(orgSoc.w.sessions),color:SER(7)},{name:'Paid social',values:cur(paidSoc.w.sessions),color:SER(3)}]);
+  const rows=plats.map(x=>{const a={},b={}; for(const k of ['posts','reach','impressions','engagements','linkClicks','sessions','cto','orders']){a[k]=sum(cur(x.w[k]));b[k]=sum(prev(x.w[k]));} return {name:x.name,followers:x.w.followers[N-1],growth:x.w.followers[N-1]/x.w.followers[N-PERIOD-1]-1,...a,er:a.engagements/a.impressions,ctr:a.linkClicks/a.impressions,_p:b};});
+  const mx=Math.max(...rows.map(r=>r.sessions));
+  table($('#so-plat'),[{key:'name',label:'Platform'},{key:'followers',label:'Followers',num:1,render:r=>fmtK(r.followers)},{key:'growth',label:'Growth',num:1,render:r=>fmtPct(r.growth,1)},{key:'posts',label:'Posts',num:1,render:r=>fmtInt(r.posts)},{key:'reach',label:'Reach',num:1,render:r=>fmtK(r.reach)},{key:'engagements',label:'Engagements',num:1,render:r=>fmtK(r.engagements)},{key:'er',label:'Eng. rate',num:1,render:r=>fmtPct(r.er,2)},{key:'linkClicks',label:'Link clicks',num:1,render:r=>fmtInt(r.linkClicks)},{key:'sessions',label:'Sessions',num:1,render:r=>barCell(r.sessions,mx,fmtInt(r.sessions))},{key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)},{key:'orders',label:'Orders',num:1,render:r=>fmtInt(r.orders)}],rows,{sortKey:'sessions'});
+  const posts=POSTS.filter(x=>x.week>=N-PERIOD&&(SOC_PLATFORM==='All'||x.platform===SOC_PLATFORM));
+  const byKey=(k,m)=>{const g={}; posts.forEach(x=>{(g[x[k]]=g[x[k]]||[]).push(x)}); return Object.entries(g).map(([l,xs])=>({label:l,value:m(xs),tip:`${xs.length} posts`})).sort((a,b)=>b.value-a.value);};
+  hbar($('#so-fmt'),byKey('format',xs=>sum(xs.map(x=>x.eng))/sum(xs.map(x=>x.reach))),v=>fmtPct(v,1),{labelW:90,color:SER(7)});
+  hbar($('#so-theme'),byKey('theme',xs=>sum(xs.map(x=>x.sessions))),fmtK,{labelW:110,color:SER(7)});
+  table($('#so-posts'),[{key:'title',label:'Post'},{key:'platform',label:'Platform'},{key:'format',label:'Format'},{key:'week',label:'Week of',render:r=>WEEK_LABELS[r.week]},{key:'reach',label:'Reach',num:1,render:r=>fmtK(r.reach)},{key:'eng',label:'Engagements',num:1,render:r=>fmtInt(r.eng)},{key:'er',label:'Eng. rate',num:1,render:r=>fmtPct(r.er,1)},{key:'lc',label:'Link clicks',num:1,render:r=>fmtInt(r.lc)},{key:'sessions',label:'Sessions',num:1,render:r=>fmtInt(r.sessions)},{key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)}],posts,{sortKey:'sessions'});
+}
+
+function renderSearch(root){
+  const [c,p]=agg(V.SEARCH);
+  const kwB=V.KEYWORDS.filter(k=>k.brand), kwNB=V.KEYWORDS.filter(k=>!k.brand);
+  const paidShare=div0(c.paidClicks,c.paidClicks+c.orgClicks), paidShareP=div0(p.paidClicks,p.paidClicks+p.orgClicks);
+  const pos=avg(cur(V.SEARCH.orgPos)), posP=avg(prev(V.SEARCH.orgPos));
+  const [pc,pp]=agg(V.paidCh.w), [oc,op]=agg(V.orgCh.w);
+  root.innerHTML=`<div class="kpis">
+    ${kpi('Paid clicks',fmtK(c.paidClicks),delta(c.paidClicks,p.paidClicks))}
+    ${kpi('Paid cost',fmtEur(c.paidCost),delta(c.paidCost,p.paidCost,{inverse:true}))}
+    ${kpi('Avg CPC',fmtEur(c.paidCost/c.paidClicks),delta(c.paidCost/c.paidClicks,p.paidCost/p.paidClicks,{inverse:true}))}
+    ${kpi('Paid search orders',fmtK(pc.orders),delta(pc.orders,pp.orders),`CTO ${fmtK(pc.cto)}`)}
+    ${kpi('Organic clicks',fmtK(c.orgClicks),delta(c.orgClicks,p.orgClicks),'Google Search Console')}
+    ${kpi('Organic orders',fmtK(oc.orders),delta(oc.orders,op.orders),`CTO ${fmtK(oc.cto)}`)}
+    ${kpi('Avg organic position',pos.toFixed(1),delta(pos,posP,{inverse:true}))}
+    ${kpi('Paid share of search clicks',fmtPct(paidShare,1),delta(paidShare,paidShareP,{pp:true}))}
+  </div>
+  <div class="grid3">${card('s-clicks','Search clicks per week','Paid (Google Ads) vs organic (Search Console)')}${card('s-ses','Search sessions per week','Paid vs organic, GA4')}${card('s-ord','Search orders per week','Paid vs organic, GA4 last non-direct click')}</div>
+  <div class="grid2">${card('s-cpc','Average CPC per week','Google Ads, all mobile campaigns')}${card('s-pos','Average organic position per week','Lower is better — axis inverted')}</div>
+  ${card('s-bnb','Brand vs non-brand (paid search, main keywords)','Aggregated over the tracked main keywords — see the Keywords tab for detail')}`;
+  const lab=cur(WEEK_LABELS);
+  lineChart($('#s-clicks'),lab,[{name:'Organic',values:cur(V.SEARCH.orgClicks),color:SER(3)},{name:'Paid',values:cur(V.SEARCH.paidClicks),color:SER(1)}]);
+  lineChart($('#s-ses'),lab,[{name:'Organic',values:cur(V.orgCh.w.sessions),color:SER(3)},{name:'Paid',values:cur(V.paidCh.w.sessions),color:SER(1)}]);
+  lineChart($('#s-ord'),lab,[{name:'Organic',values:cur(V.orgCh.w.orders),color:SER(3)},{name:'Paid',values:cur(V.paidCh.w.orders),color:SER(1)}]);
+  const cpc=cur(V.SEARCH.paidCost).map((v,i)=>v/cur(V.SEARCH.paidClicks)[i]);
+  lineChart($('#s-cpc'),lab,[{name:'Avg CPC',values:cpc,color:SER(1)}],v=>'€'+v.toFixed(2),{h:200,yMin:Math.floor(Math.min(...cpc)*10)/10-0.1});
+  const ps=cur(V.SEARCH.orgPos);
+  lineChart($('#s-pos'),lab,[{name:'Avg position',values:ps,color:SER(3)}],v=>v.toFixed(1),{h:200,yMin:Math.max(1,Math.floor(Math.min(...ps))-1),yMaxFixed:Math.ceil(Math.max(...ps))+1,invert:true});
+  const bnb=[['Brand',kwB],['Non-brand',kwNB]].map(([n,ks])=>{ const a={}; ['impr','clicks','cost','cto','orders'].forEach(k=>a[k]=sum(ks.map(x=>sum(cur(x.w[k]))))); const b={}; ['cost','orders'].forEach(k=>b[k]=sum(ks.map(x=>sum(prev(x.w[k]))))); return {name:n,...a,ctr:a.clicks/a.impr,cpc:a.cost/a.clicks,cpo:a.cost/a.orders,share:0,_p:b}; });
+  const tc=sum(bnb.map(r=>r.cost)); bnb.forEach(r=>r.share=r.cost/tc);
+  table($('#s-bnb'),[{key:'name',label:'Segment'},{key:'impr',label:'Impr.',num:1,render:r=>fmtK(r.impr)},{key:'clicks',label:'Clicks',num:1,render:r=>fmtK(r.clicks)},{key:'ctr',label:'CTR',num:1,render:r=>fmtPct(r.ctr,1)},{key:'cpc',label:'Avg CPC',num:1,render:r=>fmtEur(r.cpc)},{key:'cost',label:'Cost',num:1,render:r=>fmtEur(r.cost)},{key:'share',label:'Share of cost',num:1,render:r=>fmtPct(r.share,0)},{key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)},{key:'orders',label:'Orders',num:1,render:r=>fmtInt(r.orders)},{key:'cpo',label:'Cost / order',num:1,render:r=>`${fmtEur(r.cpo)} ${delta(r.cpo,r._p.cost/r._p.orders,{inverse:true})}`}],bnb);
+}
+
+let KW_THEME='All';
+function renderKeywords(root){
+  const themes=['All',...new Set(V.KEYWORDS.map(k=>k.theme))];
+  root.innerHTML=`<div class="filters"><label>Theme</label>${themes.map(t=>`<button class="chip ${t===KW_THEME?'on':''}" data-t="${t}">${t}</button>`).join('')}</div>
+  <div class="grid2">${card('k-cost','Spend by main keyword','Top 10 by cost, selected period')}${card('k-cpo','Cost per order by keyword','Top 10 by cost — lower is better')}</div>
+  ${card('k-tbl','Main keywords — paid & organic','IS = search impression share (Google Ads). Organic position from Search Console. Sort by any column.')}`;
+  root.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{KW_THEME=b.dataset.t;renderKeywords(root);}));
+  const ks=V.KEYWORDS.filter(k=>KW_THEME==='All'||k.theme===KW_THEME).map(k=>{ const [a,b]=agg(k.w); return {kw:k.kw,type:k.brand?'Brand':'Non-brand',theme:k.theme,impr:a.impr,clicks:a.clicks,ctr:a.clicks/a.impr,cpc:a.cost/a.clicks,cost:a.cost,dCost:a.cost/b.cost-1,cto:a.cto,orders:a.orders,cr:a.orders/a.clicks,cpo:a.cost/a.orders,is:avg(cur(k.w.is)),pos:avg(cur(k.w.pos)),_p:b}; });
+  const top=ks.slice().sort((a,b)=>b.cost-a.cost).slice(0,10);
+  hbar($('#k-cost'),top.map(k=>({label:k.kw,value:k.cost,tip:`${fmtEur(k.cost)} · ${fmtInt(k.clicks)} clicks · CPC ${fmtEur(k.cpc)}`})),fmtEur,{labelW:190});
+  hbar($('#k-cpo'),top.slice().sort((a,b)=>a.cpo-b.cpo).map(k=>({label:k.kw,value:k.cpo,tip:`${fmtEur(k.cpo)} per order · ${fmtInt(k.orders)} orders`})),fmtEur,{labelW:190,color:SER(2)});
+  const mx=Math.max(...ks.map(k=>k.cost));
+  table($('#k-tbl'),[
+    {key:'kw',label:'Keyword'},{key:'type',label:'Type'},{key:'theme',label:'Theme'},
+    {key:'impr',label:'Impr.',num:1,render:r=>fmtK(r.impr)},{key:'clicks',label:'Clicks',num:1,render:r=>fmtInt(r.clicks)},
+    {key:'ctr',label:'CTR',num:1,render:r=>fmtPct(r.ctr,1)},{key:'cpc',label:'Avg CPC',num:1,render:r=>fmtEur(r.cpc)},
+    {key:'cost',label:'Cost',num:1,render:r=>barCell(r.cost,mx,fmtEur(r.cost))},{key:'dCost',label:'Δ Cost',num:1,render:r=>delta(r.cost,r._p.cost,{inverse:true})},
+    {key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)},{key:'orders',label:'Orders',num:1,render:r=>fmtInt(r.orders)},
+    {key:'cr',label:'Conv. rate',num:1,render:r=>fmtPct(r.cr,2)},{key:'cpo',label:'Cost / order',num:1,render:r=>fmtEur(r.cpo)},
+    {key:'is',label:'IS',num:1,render:r=>fmtPct(r.is,0)},{key:'pos',label:'Org. pos.',num:1,render:r=>r.pos.toFixed(1)},
+  ],ks,{sortKey:'cost'});
+}
+
+function renderShare(root){
+  root.innerHTML=`<div class="callout"><b>Does “search market share” exist?</b> Yes — not as one official number, but as three complementary measures, all shown below:
+  <ol><li><b>Paid impression share</b> — Google Ads Auction Insights: how often Proximus ads show vs. Orange, Telenet, BASE, DIGI… on the same auctions.</li>
+  <li><b>Organic share of voice</b> — visibility index from an SEO tool (Semrush, Sistrix, SE Ranking) on a fixed basket of mobile keywords, weighted by search volume and CTR per position.</li>
+  <li><b>Share of search</b> — brand query volume of Proximus vs. competitors (Google Trends / Keyword Planner). A recognised leading indicator of market share.</li></ol></div>
+  <div class="grid2">${card('ms-is','Paid search impression share — top 3 operators','Non-brand mobile campaigns, weekly')}${card('ms-lost','Proximus: where the impressions go','Average of selected period')}</div>
+  ${card('ms-ai','Auction Insights — non-brand mobile campaigns','Overlap / position above / outranking are measured against Proximus')}
+  <div class="grid2">${card('ms-seo','Organic share of voice','Visibility on 250 tracked mobile keywords (BE, NL + FR)')}${card('ms-sos','Share of search','Brand search volume, Belgium, last 3 months')}</div>`;
+  const lab=cur(WEEK_LABELS);
+  lineChart($('#ms-is'),lab,COMPETITORS.slice(0,3).map((c,i)=>({name:c.name,values:cur(c.w),color:SER(i+1)})),v=>fmtPct(v,0),{yMaxFixed:0.8});
+  const isv=avg(cur(COMPETITORS[0].w)), lb=avg(cur(LOST_IS.budget)), lr=avg(cur(LOST_IS.rank)); const t=isv+lb+lr;
+  segBar($('#ms-lost'),[{label:'Impression share',value:isv/t,color:SER(1)},{label:'Lost — rank',value:lr/t,color:SER(2)},{label:'Lost — budget',value:lb/t,color:SER(4)}]);
+  $('#ms-lost').insertAdjacentHTML('beforeend',`<p class="note">Lost IS (rank) is mostly driven by Quality Score and bids on smartphone keywords; lost IS (budget) concentrates on the iPhone campaigns during launch weeks.</p>`);
+  const rows=COMPETITORS.map(c=>({name:c.name,is:avg(cur(c.w)),isP:avg(prev(c.w)),overlap:c.overlap,above:c.above,top:c.top,outrank:c.outrank}));
+  table($('#ms-ai'),[{key:'name',label:'Advertiser'},{key:'is',label:'Impression share',num:1,render:r=>`${barCell(r.is,1,fmtPct(r.is,1))}`},{key:'isP',label:'Δ',num:1,render:r=>delta(r.is,r.isP,{pp:true})},{key:'overlap',label:'Overlap rate',num:1,render:r=>r.overlap==null?'–':fmtPct(r.overlap,0)},{key:'above',label:'Position above rate',num:1,render:r=>r.above==null?'–':fmtPct(r.above,0)},{key:'top',label:'Top of page rate',num:1,render:r=>fmtPct(r.top,0)},{key:'outrank',label:'Proximus outranking share',num:1,render:r=>r.outrank==null?'–':fmtPct(r.outrank,0)}],rows,{sortKey:'is'});
+  const ops=COMPETITORS.filter(c=>!['Coolblue','MediaMarkt'].includes(c.name));
+  hbar($('#ms-seo'),COMPETITORS.map(c=>({label:c.name,value:c.seo,color:c.name.startsWith('Proximus')?SER(1):'var(--neutral-bar)'})),v=>fmtPct(v,0),{labelW:130});
+  hbar($('#ms-sos'),ops.map(c=>({label:c.name,value:c.sos,color:c.name.startsWith('Proximus')?SER(1):'var(--neutral-bar)'})),v=>fmtPct(v,0),{labelW:130});
+}
+
+let SEO_SEL=['Device Finder PDP','Find Number Owner','Standalone Overview','Device Finder Overview'];
+function renderSEO(root){
+  const all=V.SEO.map(x=>{const ci=sum(cur(x.w.impr)),pi=sum(prev(x.w.impr)),cc=sum(cur(x.w.clicks)),pc=sum(prev(x.w.clicks));
+    const pos=div0(sum(cur(x.w.posW)),ci), posP=pi?sum(prev(x.w.posW))/pi:null;
+    return {g:x.g,x,i:ci,ip:pi,c:cc,cp:pc,ctr:div0(cc,ci),ctrP:pi?pc/pi:null,pos,posP};});
+  root.innerHTML=`<div class="callout small">Search Console, grouped by URL regex into content groups. With the period set to <b>last 13 weeks</b> and no device/language filter, the table matches the GSC export you supplied; the weekly series around it are simulated for the POC. Select up to 5 groups to compare.</div>
+  <div class="filters"><label>Content groups</label>${V.SEO.map(x=>{const k=SEO_SEL.indexOf(x.g);return `<button class="chip ${k>=0?'on':''}" data-g="${x.g}">${k>=0?`<i class="sw" style="background:${SER(k+1)}"></i>`:''}${x.g}</button>`}).join('')}</div>
+  <div class="grid2">${card('seo-wi','Impressions per week')}${card('seo-wc','Clicks per week')}</div>
+  <div class="grid2">${card('seo-wctr','URL CTR per week','Clicks ÷ impressions')}${card('seo-wpos','Average position per week','Impression-weighted · lower is better, axis inverted')}</div>
+  ${card('seo-stack','Share of organic clicks per week','Selected content groups vs all other groups')}
+  ${card('seo-tbl','Content groups — selected period','Δ = change vs previous period. Groups without history show “–”.')}`;
+  root.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{ const g=b.dataset.g, k=SEO_SEL.indexOf(g); if(k>=0) SEO_SEL.splice(k,1); else if(SEO_SEL.length<5) SEO_SEL.push(g); renderSEO(root); }));
+  const lab=cur(WEEK_LABELS);
+  const sel=SEO_SEL.map((g,k)=>({x:V.SEO.find(s=>s.g===g),color:SER(k+1)}));
+  if(sel.length){
+    lineChart($('#seo-wi'),lab,sel.map(s=>({name:s.x.g,values:cur(s.x.w.impr),color:s.color})));
+    lineChart($('#seo-wc'),lab,sel.map(s=>({name:s.x.g,values:cur(s.x.w.clicks),color:s.color})));
+    lineChart($('#seo-wctr'),lab,sel.map(s=>({name:s.x.g,values:cur(s.x.w.clicks).map((v,i)=>div0(v,cur(s.x.w.impr)[i])),color:s.color})),v=>fmtPct(v,1));
+    const posS=sel.map(s=>({name:s.x.g,values:cur(s.x.w.posW).map((v,i)=>{const im=cur(s.x.w.impr)[i];return im?v/im:null}),color:s.color})).filter(s=>s.values.every(v=>v!=null));
+    if(posS.length){ const vs=posS.flatMap(s=>s.values); lineChart($('#seo-wpos'),lab,posS,v=>v.toFixed(1),{yMin:Math.max(1,Math.floor(Math.min(...vs))-1),yMaxFixed:Math.ceil(Math.max(...vs))+1,invert:true}); }
+    else $('#seo-wpos').innerHTML='<p class="note">No full position history for the selected groups in this period.</p>';
+  } else ['#seo-wi','#seo-wc','#seo-wctr','#seo-wpos'].forEach(id=>$(id).innerHTML='<p class="note">Select at least one content group above.</p>');
+  const rest=V.SEO.filter(x=>!SEO_SEL.includes(x.g));
+  stackedCols($('#seo-stack'),lab,[...sel.map(s=>({name:s.x.g,color:s.color,values:cur(s.x.w.clicks)})),{name:'All other groups',color:'var(--neutral-bar)',values:cur(WEEKS.map((_,i)=>sum(rest.map(r=>r.w.clicks[i]))))}]);
+  const d=(c,p,inv,pp)=>{ if(p==null||!p) return '<span class="delta flat">–</span>'; return delta(c,p,{inverse:inv,pp}); };
+  const mx=Math.max(...all.map(r=>r.i));
+  table($('#seo-tbl'),[{key:'g',label:'Content group'},{key:'i',label:'Impressions',num:1,render:r=>barCell(r.i,mx,fmtInt(r.i))},{key:'di',label:'Δ',num:1,render:r=>d(r.i,r.ip)},{key:'c',label:'URL clicks',num:1,render:r=>fmtInt(r.c)},{key:'dc',label:'Δ',num:1,render:r=>d(r.c,r.cp)},{key:'ctr',label:'URL CTR',num:1,render:r=>fmtPct(r.ctr,2)},{key:'dctr',label:'Δ',num:1,render:r=>d(r.ctr,r.ctrP)},{key:'pos',label:'Avg position',num:1,render:r=>r.pos?r.pos.toFixed(2):'–'},{key:'dpos',label:'Δ',num:1,render:r=>d(r.pos,r.posP,true)}],all,{sortKey:'i'});
+}
+
+function renderProducts(root){
+  root.innerHTML=`<h2 class="sec">Mobile subscriptions</h2>
+  <div class="grid2">${card('p-plan-w','Subscription orders per week by plan','SIM-only subscriptions (smartphone + subscription orders are counted under Smartphones)')}${card('p-plan-mix','Plan mix','Share of subscription orders, selected period')}</div>
+  ${card('p-plan-v','Subscription page views per week by plan','Visits to the plan pages')}
+  ${card('p-plan','Subscription plans — funnel & value','MRR = orders × promotional monthly price (first 12 months)')}
+  <h2 class="sec">Smartphones</h2>
+  <div class="grid2">${card('p-brand','Smartphone orders by brand')}${card('p-attach','Orders with vs without subscription','Share of smartphone orders')}</div>
+  ${card('p-phone-v','Smartphone page views per week by brand','Visits to product detail pages (PDP)')}
+  ${card('p-phone','Smartphones — funnel','Prices as listed on the product listing page')}
+  <h2 class="sec">Options & add-ons</h2>
+  ${card('p-opt','Options — attach and standalone orders','Options are mostly added in the Composer; standalone CTO = “Order now” on the option page itself')}`;
+  const tot=sum(V.PLANS.map(p=>sum(cur(p.w.orders))));
+  stackedCols($('#p-plan-w'),cur(WEEK_LABELS),V.PLANS.map((p,i)=>({name:p.name.replace('Mobile ',''),color:SER(i+1),values:cur(p.w.orders)})));
+  lineChart($('#p-plan-v'),cur(WEEK_LABELS),V.PLANS.map((p,i)=>({name:p.name.replace('Mobile ',''),color:SER(i+1),values:cur(p.w.views)})));
+  segBar($('#p-plan-mix'),V.PLANS.map((p,i)=>({label:p.name.replace('Mobile ',''),value:sum(cur(p.w.orders))/tot,color:SER(i+1)})));
+  const pr=V.PLANS.map(p=>{const [a,b]=agg(p.w);return {name:p.name,data:p.data,price:p.promo,views:a.views,cto:a.cto,orders:a.orders,close:a.orders/a.cto,ctoRate:a.cto/a.views,mrr:a.orders*p.promo,dO:a.orders/b.orders-1,_p:b}});
+  const mx=Math.max(...pr.map(r=>r.orders));
+  table($('#p-plan'),[{key:'name',label:'Plan'},{key:'data',label:'Data'},{key:'price',label:'Price / month',num:1,render:r=>fmtPrice(r.price)},{key:'views',label:'Page views',num:1,render:r=>fmtK(r.views)},{key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)},{key:'ctoRate',label:'CTO rate',num:1,render:r=>fmtPct(r.ctoRate,1)},{key:'orders',label:'Orders',num:1,render:r=>barCell(r.orders,mx,fmtInt(r.orders))},{key:'dO',label:'Δ Orders',num:1,render:r=>delta(r.orders,r._p.orders)},{key:'close',label:'CTO → Order',num:1,render:r=>fmtPct(r.close,1)},{key:'mrr',label:'New MRR',num:1,render:r=>fmtEur(r.mrr)}],pr,{sortKey:'orders'});
+  const brands=['Apple','Samsung','Google','Xiaomi'];
+  hbar($('#p-brand'),brands.map((b,i)=>({label:b,value:sum(V.PHONE_OBJS.filter(p=>p.brand===b).map(p=>sum(cur(p.w.orders))))})),fmtK,{labelW:90,color:SER(7)});
+  lineChart($('#p-phone-v'),cur(WEEK_LABELS),brands.map((b,i)=>({name:b,color:SER(i+1),values:cur(WEEKS.map((_,w)=>sum(V.PHONE_OBJS.filter(p=>p.brand===b).map(p=>p.w.views[w]))))})));
+  const po=sum(V.PHONE_OBJS.map(p=>sum(cur(p.w.orders)))), ws=sum(V.PHONE_OBJS.map(p=>sum(cur(p.w.withSub))));
+  segBar($('#p-attach'),[{label:'With subscription',value:ws/po,color:SER(1)},{label:'Without subscription',value:1-ws/po,color:SER(2)}]);
+  const ph=V.PHONE_OBJS.map(p=>{const [a,b]=agg(p.w);return {brand:p.brand,model:p.model,withSub:p.withSub,without:p.without,views:a.views,cto:a.cto,orders:a.orders,close:a.orders/a.cto,att:a.withSub/a.orders,dO:a.orders/b.orders-1,_p:b}});
+  const mxp=Math.max(...ph.map(r=>r.orders));
+  table($('#p-phone'),[{key:'brand',label:'Brand'},{key:'model',label:'Model'},{key:'withSub',label:'From (with sub.)',num:1,render:r=>r.withSub==null?'–':fmtPrice(r.withSub)},{key:'without',label:'Without sub.',num:1,render:r=>r.without==null?'–':fmtPrice(r.without)},{key:'views',label:'PDP views',num:1,render:r=>fmtK(r.views)},{key:'cto',label:'CTO',num:1,render:r=>fmtInt(r.cto)},{key:'orders',label:'Orders',num:1,render:r=>barCell(r.orders,mxp,fmtInt(r.orders))},{key:'dO',label:'Δ Orders',num:1,render:r=>delta(r.orders,r._p.orders)},{key:'close',label:'CTO → Order',num:1,render:r=>fmtPct(r.close,1)},{key:'att',label:'With sub.',num:1,render:r=>fmtPct(r.att,0)}],ph,{sortKey:'orders'});
+  const [tc]=agg(V.TOTAL);
+  const op=V.OPTIONS.map(o=>{const [a,b]=agg(o.w);return {name:o.name,cto:a.cto,orders:a.orders,close:a.orders/a.cto,attach:a.orders/tc.orders,dO:a.orders/b.orders-1,_p:b}});
+  table($('#p-opt'),[{key:'name',label:'Option'},{key:'orders',label:'Added to orders',num:1,render:r=>fmtInt(r.orders)},{key:'dO',label:'Δ',num:1,render:r=>delta(r.orders,r._p.orders)},{key:'attach',label:'Attach rate*',num:1,render:r=>fmtPct(r.attach,1)},{key:'cto',label:'Standalone CTO',num:1,render:r=>fmtInt(r.cto)}],op,{sortKey:'orders'});
+  $('#p-opt').insertAdjacentHTML('beforeend','<p class="note">* Attach rate = option orders ÷ all mobile orders in the period.</p>');
+}
+
+let FN_MODE='subscriptions', FN_ITEM='all';
+const FN_STEPS=[['views','Product page'],['cto','Composer'],['identify','Identify'],['overview','Overview'],['orders','Confirmation']];
+function fnItems(type){ return type==='subscriptions'? V.PLANS.map(p=>({id:p.name,label:p.name,w:p.w})) : V.PHONE_OBJS.map(p=>({id:p.model,label:`${p.brand} ${p.model}`,brand:p.brand,w:p.w})); }
+function fnSeries(type,item){ let its=fnItems(type); if(item&&item!=='all') its=its.filter(x=>x.id===item||x.brand===item); const o={}; FN_STEPS.forEach(([k])=>o[k]=WEEKS.map((_,i)=>sum(its.map(x=>x.w[k][i])))); return o; }
+function funnelBlock(el,type,item,title){
+  const s=fnSeries(type,item); const c=FN_STEPS.map(([k])=>sum(cur(s[k]))), p=FN_STEPS.map(([k])=>sum(prev(s[k])));
+  const W=el.clientWidth||600, rowH=58, H=FN_STEPS.length*rowH, lw=120, maxW=W-lw-150;
+  let g='';
+  FN_STEPS.forEach(([k,l],i)=>{ const w=i?Math.max(3,maxW*0.8*c[i]/c[1]):maxW, y=i*rowH+8, x=lw+(maxW-w)/2;
+    g+=`<text x="${lw-12}" y="${y+22}" class="lab" text-anchor="end">${l}</text>`;
+    g+=`<rect x="${x}" y="${y+6}" width="${w}" height="26" rx="4" fill="${type==='subscriptions'?SER(1):SER(7)}" class="bar" data-i="${i}"/>`;
+    if(!i) g+=`<text x="${lw+maxW/2}" y="${y+24}" text-anchor="middle" class="onbar">not to scale — later steps are scaled to Composer</text>`;
+    g+=`<text x="${lw+maxW+12}" y="${y+18}" class="val">${fmtInt(c[i])}</text><text x="${lw+maxW+12}" y="${y+33}" class="axis">${i?fmtPct(c[i]/c[i-1],1)+' of prev.':'100%'}</text>`;
+    if(i) g+=`<text x="${lw+maxW/2}" y="${y+2}" class="axis" text-anchor="middle">▼ drop-off ${fmtInt(c[i-1]-c[i])} (${fmtPct(1-c[i]/c[i-1],1)})</text>`;
+    g+=`<rect x="0" y="${y}" width="${W}" height="${rowH-6}" fill="transparent" class="hitbar" data-i="${i}"/>`; });
+  el.innerHTML=(title?`<div class="fn-title">${title}</div>`:'')+`<svg width="${W}" height="${H}">${g}</svg>
+   <div class="fn-sum"><span>Product page → Confirmation <b>${fmtPct(c[4]/c[0],2)}</b> ${delta(c[4]/c[0],p[4]/p[0],{pp:true})}</span><span>Composer → Confirmation <b>${fmtPct(c[4]/c[1],1)}</b> ${delta(c[4]/c[1],p[4]/p[1],{pp:true})}</span></div>`;
+  el.querySelectorAll('.hitbar').forEach(b=>{const i=+b.dataset.i; b.addEventListener('mousemove',ev=>showTip(`<b>${FN_STEPS[i][1]}</b><div>Volume<span>${fmtInt(c[i])}</span></div>${i?`<div>Step conversion<span>${fmtPct(c[i]/c[i-1],1)}</span></div>`:''}<div>From product page<span>${fmtPct(c[i]/c[0],2)}</span></div><div>Prev. period<span>${fmtInt(p[i])}</span></div>`,ev)); b.addEventListener('mouseleave',hideTip);});
+  return {s,c,p};
+}
+function renderFunnel(root){
+  const types = FN_MODE==='compare'?['subscriptions','smartphones']:[FN_MODE];
+  const opts = FN_MODE==='subscriptions'? V.PLANS.map(p=>[p.name,p.name]) : FN_MODE==='smartphones'? [...['Apple','Samsung','Google','Xiaomi'].map(b=>[b,'All '+b]),...V.PHONE_OBJS.map(p=>[p.model,`${p.brand} ${p.model}`])] : [];
+  if(!opts.some(o=>o[0]===FN_ITEM)) FN_ITEM='all';
+  root.innerHTML=`<div class="filters"><label>Product type</label>${[['subscriptions','Subscriptions'],['smartphones','Smartphones'],['compare','Compare both']].map(([k,l])=>`<button class="chip ${FN_MODE===k?'on':''}" data-m="${k}">${l}</button>`).join('')}
+    ${opts.length?`<label style="margin-left:14px">Product</label><select id="fn-item"><option value="all">${FN_MODE==='subscriptions'?'All plans':'All smartphones'}</option>${opts.map(([v,l])=>`<option value="${v}" ${FN_ITEM===v?'selected':''}>${l}</option>`).join('')}</select>`:''}</div>
+  <div class="${types.length>1?'grid2':''}">${types.map(t=>card('fn-'+t,(t==='subscriptions'?'Subscriptions':'Smartphones')+' — order funnel','Product page → Composer → Identify → Overview → Confirmation · selected period')).join('')}</div>
+  ${card('fn-tbl','Step detail','Volumes, step conversion and change vs previous period')}
+  <div class="grid2">${card('fn-rate','Step conversion per week',types.length>1?'Product page → Confirmation, by product type':'Conversion of each step from the previous one, from Composer onwards')}${card('fn-vol','Volume per step per week',types.length>1?'Composer and Confirmation, by product type':'Product page excluded (different scale) — see the funnel')}</div>
+  ${card('fn-prod','Funnel by product','Step conversion per product — spot where each product loses customers')}`;
+  root.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{FN_MODE=b.dataset.m;FN_ITEM='all';renderFunnel(root);}));
+  const sel=$('#fn-item'); if(sel) sel.addEventListener('change',e=>{FN_ITEM=e.target.value;renderFunnel(root);});
+  const R={}; types.forEach(t=>R[t]=funnelBlock($('#fn-'+t),t,types.length>1?'all':FN_ITEM));
+  const rows=[]; types.forEach(t=>FN_STEPS.forEach(([k,l],i)=>{const r=R[t]; rows.push({type:t==='subscriptions'?'Subscriptions':'Smartphones',step:`${i+1}. ${l}`,vol:r.c[i],dv:r.c[i]/r.p[i]-1,_pv:r.p[i],sc:i?r.c[i]/r.c[i-1]:null,scp:i?r.p[i]/r.p[i-1]:null,cum:r.c[i]/r.c[0],drop:i?r.c[i-1]-r.c[i]:null});}));
+  const cols=[...(types.length>1?[{key:'type',label:'Product type'}]:[]),{key:'step',label:'Step'},{key:'vol',label:'Volume',num:1,render:r=>fmtInt(r.vol)},{key:'dv',label:'Δ Volume',num:1,render:r=>delta(r.vol,r._pv)},{key:'sc',label:'Step conversion',num:1,render:r=>r.sc==null?'–':fmtPct(r.sc,1)},{key:'scd',label:'Δ',num:1,render:r=>r.sc==null?'':delta(r.sc,r.scp,{pp:true})},{key:'cum',label:'From product page',num:1,render:r=>fmtPct(r.cum,2)},{key:'drop',label:'Drop-off',num:1,render:r=>r.drop==null?'–':fmtInt(r.drop)}];
+  table($('#fn-tbl'),cols,rows);
+  const lab=cur(WEEK_LABELS);
+  if(types.length>1){
+    lineChart($('#fn-rate'),lab,types.map((t,i)=>({name:t==='subscriptions'?'Subscriptions':'Smartphones',color:i?SER(7):SER(1),values:cur(R[t].s.orders).map((v,w)=>div0(v,cur(R[t].s.views)[w]))})),v=>fmtPct(v,2));
+    lineChart($('#fn-vol'),lab,[['subscriptions','Subscriptions',SER(1)],['smartphones','Smartphones',SER(7)]].flatMap(([t,n,c])=>[{name:n+' — Composer',color:c,values:cur(R[t].s.cto),dash:1},{name:n+' — Confirmation',color:c,values:cur(R[t].s.orders)}]));
+  } else {
+    const s=R[types[0]].s;
+    lineChart($('#fn-rate'),lab,FN_STEPS.slice(2).map(([k,l],j)=>{const i=j+1; return {name:`${FN_STEPS[i][1]} → ${l}`,color:SER(j+2),values:cur(s[k]).map((v,w)=>div0(v,cur(s[FN_STEPS[i][0]])[w]))};}),v=>fmtPct(v,0),{yMin:0,yMaxFixed:1});
+    $('#fn-rate').insertAdjacentHTML('beforeend',`<p class="note">Product page → Composer (the CTO rate, ${fmtPct(div0(sum(cur(s.cto)),sum(cur(s.views))),2)}) is left out to keep the scale readable.</p>`);
+    lineChart($('#fn-vol'),lab,FN_STEPS.slice(1).map(([k,l],i)=>({name:l,color:SER(i+1),values:cur(s[k])})),fmtK);
+  }
+  const prods=types.flatMap(t=>fnItems(t).filter(x=>types.length>1||FN_ITEM==='all'||x.id===FN_ITEM||x.brand===FN_ITEM).map(x=>{const v={}; FN_STEPS.forEach(([k])=>v[k]=sum(cur(x.w[k]))); return {type:t==='subscriptions'?'Subscription':'Smartphone',name:x.label,views:v.views,s1:v.cto/v.views,s2:v.identify/v.cto,s3:v.overview/v.identify,s4:v.orders/v.overview,orders:v.orders,all:v.orders/v.views};}));
+  const heat=(val,arr)=>{const mn=Math.min(...arr),mx=Math.max(...arr); const t=mx>mn?(val-mn)/(mx-mn):0.5; return `<span class="heat" style="background:color-mix(in srgb,var(--series-1) ${Math.round(8+t*40)}%,transparent)">${fmtPct(val,1)}</span>`;};
+  const col=k=>prods.map(r=>r[k]);
+  table($('#fn-prod'),[...(types.length>1?[{key:'type',label:'Type'}]:[]),{key:'name',label:'Product'},{key:'views',label:'Product page',num:1,render:r=>fmtK(r.views)},{key:'s1',label:'→ Composer',num:1,render:r=>heat(r.s1,col('s1'))},{key:'s2',label:'→ Identify',num:1,render:r=>heat(r.s2,col('s2'))},{key:'s3',label:'→ Overview',num:1,render:r=>heat(r.s3,col('s3'))},{key:'s4',label:'→ Confirmation',num:1,render:r=>heat(r.s4,col('s4'))},{key:'orders',label:'Orders',num:1,render:r=>fmtInt(r.orders)},{key:'all',label:'Page → Order',num:1,render:r=>fmtPct(r.all,2)}],prods,{sortKey:'orders'});
+  $('#fn-prod').insertAdjacentHTML('beforeend','<p class="note">Cell shading: darker = better conversion within the column.</p>');
+}
+
+function renderSources(root){
+  const src=[
+    ['Sessions, CTO, orders by channel & product','GA4 (BigQuery export)','Daily','Channel grouping customised: AI assistants, Proximus app, DV360 split out'],
+    ['Confirmed orders & revenue','Order back-end (CRM / order management)','Daily','Source of truth for orders; GA4 transaction_id used for reconciliation'],
+    ['Paid search cost, clicks, keywords','Google Ads / Search Ads 360 API','Daily','Keyword view, search terms, brand/non-brand label'],
+    ['Paid search impression share & Auction Insights','Google Ads (UI export or SA360 reports)','Weekly','Auction Insights is not in the standard API — scheduled export or SA360'],
+    ['Display & video','DV360 API (Bid Manager reports)','Daily','Floodlight conversions; post-view window to be agreed'],
+    ['Paid social','Meta Marketing API, TikTok Ads API, Snapchat Marketing API','Daily','Cost + platform conversions (CAPI) next to GA4 orders'],
+    ['Email','Email platform API + UTM in GA4','Daily','Sends, opens, clicks → sessions, CTO, orders'],
+    ['Organic social activity','Meta Graph API (Facebook, Instagram), TikTok Business API, LinkedIn Pages API, YouTube Analytics API','Daily','Followers, posts, reach, impressions, engagements, link clicks'],
+    ['Social engagement to site','GA4 with UTM on every post link','Daily','Sessions, CTO and orders per platform and per post (utm_content = post ID)'],
+    ['Organic search','Google Search Console API (BigQuery bulk export)','Daily','Content groups by URL regex, brand/non-brand by query regex'],
+    ['Organic share of voice','Semrush / Sistrix / SE Ranking','Weekly','Fixed basket of mobile keywords, NL + FR'],
+    ['Share of search','Google Trends / Keyword Planner','Monthly','Proximus vs Orange, Telenet, BASE, DIGI, Mobile Vikings'],
+  ];
+  const defs=[
+    ['Call to Order (CTO)','Click on an “Order now” button (plans, smartphones, options) that starts the order flow. GA4 event: <code>call_to_order</code> with product parameters.'],
+    ['Order','Completed order (GA4 <code>purchase</code>, reconciled with the back-end).'],
+    ['Order funnel steps','<b>Product page</b> (plan page or smartphone PDP view) → <b>Composer</b> (configurator reached after Call to Order: plan, options, number) → <b>Identify</b> (login / customer identification) → <b>Overview</b> (order summary) → <b>Confirmation</b> (order placed). One GA4 event per step with <code>product_type</code> and <code>item_id</code>.'],
+    ['Conversion rate','Orders ÷ sessions.'],
+    ['CTO rate','Call to Order ÷ sessions (or ÷ page views at product level).'],
+    ['CTO → Order rate','Orders ÷ Call to Order — measures the quality of the order flow.'],
+    ['Cost per order (CPO)','Media spend ÷ orders attributed to the channel (GA4 last non-direct click by default).'],
+    ['New MRR','Orders × monthly price of the plan (promotional price during the first 12 months).'],
+    ['Impression share','Impressions received ÷ impressions eligible (Google Ads).'],
+  ];
+  root.innerHTML=`<div class="grid2">${card('src','Data sources (target set-up for the POC)')}${card('def','KPI definitions')}</div>`;
+  table($('#src'),[{key:0,label:'Data'},{key:1,label:'Source'},{key:2,label:'Refresh'},{key:3,label:'Notes'}],src);
+  $('#def').innerHTML=`<dl class="defs">${defs.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
+}
+
+const RENDER={overview:renderOverview,channels:renderChannels,search:renderSearch,keywords:renderKeywords,share:renderShare,seo:renderSEO,social:renderSocial,products:renderProducts,funnel:renderFunnel,sources:renderSources};
+
+const CH_SCOPE=new Set(['overview','channels','products','funnel']);
+function filterBar(){
+  const n=FILTER.channels.size, tot=RAW.CHANNELS.length;
+  const lbl = n===tot?'All channels':n===0?'No channel':n<=2?RAW.CHANNELS.filter(c=>FILTER.channels.has(c.id)).map(c=>c.name).join(', '):`${n} of ${tot} channels`;
+  const chOn=CH_SCOPE.has(ACTIVE), dvOn=ACTIVE!=='share'&&ACTIVE!=='sources';
+  const isDefault = n===tot&&FILTER.device==='all'&&FILTER.lang==='all';
+  $('#fbar').innerHTML=`
+   <details class="dd ${chOn?'':'off'}" ${chOn?'':'title="Channel filter does not apply to this tab"'}><summary>Channel: <b>${lbl}</b></summary>
+     <div class="dd-panel"><div class="dd-act"><button data-a="all">Select all</button><button data-a="none">Clear</button></div>
+     ${RAW.CHANNELS.map(c=>`<label><input type="checkbox" value="${c.id}" ${FILTER.channels.has(c.id)?'checked':''}> ${c.name}</label>`).join('')}</div></details>
+   <label class="fl ${dvOn?'':'off'}">Device <select id="f-dev" ${dvOn?'':'disabled'}>${[['all','All devices'],['mobile','Mobile'],['desktop','Desktop'],['tablet','Tablet']].map(([v,l])=>`<option value="${v}" ${FILTER.device===v?'selected':''}>${l}</option>`).join('')}</select></label>
+   <label class="fl ${dvOn?'':'off'}">Language <select id="f-lang" ${dvOn?'':'disabled'}>${[['all','All languages'],['nl','Dutch (NL)'],['fr','French (FR)'],['en','English (EN)']].map(([v,l])=>`<option value="${v}" ${FILTER.lang===v?'selected':''}>${l}</option>`).join('')}</select></label>
+   <label class="fl">Period <select id="period">${[[4,'Last 4 weeks'],[13,'Last 13 weeks'],[26,'Last 26 weeks']].map(([v,l])=>`<option value="${v}" ${PERIOD===v?'selected':''}>${l}</option>`).join('')}</select></label>
+   <span class="muted fl-note">${!chOn&&n<tot?'Channel filter not applied on this tab · ':''}${ACTIVE==='share'?'Market-share data is not split by device or language · ':''}compared with previous period</span>
+   ${isDefault?'':'<button class="ghost small" id="f-reset">Reset filters</button>'}`;
+  const dd=$('#fbar .dd');
+  dd.querySelectorAll('input').forEach(i=>i.addEventListener('change',()=>{ i.checked?FILTER.channels.add(i.value):FILTER.channels.delete(i.value); refresh(true); }));
+  dd.querySelectorAll('.dd-act button').forEach(b=>b.addEventListener('click',()=>{ FILTER.channels=new Set(b.dataset.a==='all'?RAW.CHANNELS.map(c=>c.id):[]); refresh(true); }));
+  $('#f-dev').addEventListener('change',e=>{FILTER.device=e.target.value;refresh();});
+  $('#f-lang').addEventListener('change',e=>{FILTER.lang=e.target.value;refresh();});
+  $('#period').addEventListener('change',e=>{PERIOD=+e.target.value;refresh();});
+  const r=$('#f-reset'); if(r) r.addEventListener('click',()=>{FILTER.channels=new Set(RAW.CHANNELS.map(c=>c.id));FILTER.device='all';FILTER.lang='all';refresh();});
+}
+function refresh(keepOpen){ applyFilters(); render(); if(keepOpen) $('#fbar .dd').open=true; }
+function render(){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===ACTIVE));
+  const s=WEEKS[N-PERIOD], e=new Date(WEEKS[N-1]); e.setUTCDate(e.getUTCDate()+6);
+  const f=d=>`${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  $('#range').textContent=`${f(s)} – ${f(e)}`;
+  filterBar();
+  if(CH_SCOPE.has(ACTIVE)&&FILTER.channels.size===0){ $('#main').innerHTML='<div class="callout">No channel selected — pick at least one channel in the filter bar.</div>'; return; }
+  RENDER[ACTIVE]($('#main'));
+}
+document.addEventListener('click',e=>{const d=document.querySelector('#fbar .dd'); if(!e.target.isConnected) return; if(d&&d.open&&!d.contains(e.target)) d.open=false;});
+document.addEventListener('DOMContentLoaded',()=>{
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-t="${k}">${l}</button>`).join('');
+  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('.tab'); if(b){ACTIVE=b.dataset.t; render(); scrollTo(0,0);}});
+  $('#theme').addEventListener('click',()=>{const d=document.documentElement; const dark=d.dataset.theme==='dark'||(!d.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches); d.dataset.theme=dark?'light':'dark'; render();});
+  applyFilters(); render();
+  let to; addEventListener('resize',()=>{clearTimeout(to);to=setTimeout(render,150);});
+});
+
+</script>
+</body>
+</html>
